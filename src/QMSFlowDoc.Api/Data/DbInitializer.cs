@@ -92,6 +92,40 @@ public static class DbInitializer
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"Reagents\" ADD COLUMN IF NOT EXISTS \"Classification\" text;"); } catch { }
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"ReagentLots\" ADD COLUMN IF NOT EXISTS \"PanelId\" uuid;"); } catch { }
 
+            // ISO 15189 Security & Integrity Updates
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"FailedLoginAttempts\" integer NOT NULL DEFAULT 0;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"LockedUntil\" timestamp with time zone;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"PasswordChangedAt\" timestamp with time zone;"); } catch { }
+            
+            // Ensure AuditLogs table exists for EF Core
+            try 
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS ""AuditLogs"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""Timestamp"" timestamp with time zone NOT NULL,
+                        ""UserId"" uuid,
+                        ""UserName"" text,
+                        ""Action"" text,
+                        ""EntityType"" text,
+                        ""EntityId"" uuid,
+                        ""Details"" text,
+                        ""Reason"" text,
+                        ""BeforeSnapshot"" text,
+                        ""AfterSnapshot"" text,
+                        ""IntegrityHash"" text,
+                        ""Result"" text,
+                        ""MachineName"" text
+                    );");
+            } 
+            catch { }
+
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"AuditLogs\" ADD COLUMN IF NOT EXISTS \"Result\" text;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"AuditLogs\" ADD COLUMN IF NOT EXISTS \"BeforeSnapshot\" text;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"AuditLogs\" ADD COLUMN IF NOT EXISTS \"AfterSnapshot\" text;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"AuditLogs\" ADD COLUMN IF NOT EXISTS \"IntegrityHash\" text;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"AuditLogs\" ADD COLUMN IF NOT EXISTS \"MachineName\" text;"); } catch { }
+
             // Create ISO 15189 Tables if missing
             try
             {
