@@ -1,0 +1,69 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.RiskEditorView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:QMSFlowDoc.Client.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="24" MaxWidth="600" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Click="Back_Click">
+                    <FontIcon Glyph="&#xE72B;" />
+                </Button>
+                <TextBlock Text="Registrar Nuevo Riesgo" Style="{StaticResource TitleTextBlockStyle}" />
+            </StackPanel>
+
+            <StackPanel Spacing="16">
+                <TextBox x:Name="TitleBox" Header="Título del Riesgo" PlaceholderText="Ej: Fallo en cadena de frío" />
+                <TextBox x:Name="DescriptionBox" Header="Descripción" PlaceholderText="Detalle el riesgo..." AcceptsReturn="True" Height="80" />
+                
+                <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="16" RowSpacing="16">
+                    <ComboBox x:Name="CategoryCombo" Header="Categoría" HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="Técnico" IsSelected="True" />
+                        <ComboBoxItem Content="Operativo" />
+                        <ComboBoxItem Content="Financiero" />
+                        <ComboBoxItem Content="Calidad" />
+                        <ComboBoxItem Content="Seguridad" />
+                    </ComboBox>
+                    <TextBox x:Name="OwnerBox" Header="Responsable" PlaceholderText="Nombre del responsable" Grid.Column="1" />
+                    
+                    <ComboBox x:Name="StatusCombo" Header="Estado" HorizontalAlignment="Stretch" Grid.Row="1">
+                        <ComboBoxItem Content="ACTIVE" IsSelected="True" />
+                        <ComboBoxItem Content="CLOSED" />
+                        <ComboBoxItem Content="MONITORING" />
+                    </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="16">
+                    <ComboBox x:Name="LikelihoodCombo" Header="Probabilidad" HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="Muy Baja" Tag="1" />
+                        <ComboBoxItem Content="Baja" Tag="2" />
+                        <ComboBoxItem Content="Media" Tag="3" IsSelected="True" />
+                        <ComboBoxItem Content="Alta" Tag="4" />
+                        <ComboBoxItem Content="Muy Alta" Tag="5" />
+                    </ComboBox>
+                    <ComboBox x:Name="ImpactCombo" Header="Impacto" HorizontalAlignment="Stretch" Grid.Column="1">
+                        <ComboBoxItem Content="Mínimo" Tag="1" />
+                        <ComboBoxItem Content="Menor" Tag="2" />
+                        <ComboBoxItem Content="Moderado" Tag="3" IsSelected="True" />
+                        <ComboBoxItem Content="Mayor" Tag="4" />
+                        <ComboBoxItem Content="Catastrófico" Tag="5" />
+                    </ComboBox>
+                </Grid>
+
+                <TextBox x:Name="MitigationBox" Header="Plan de Mitigación" PlaceholderText="Acciones para reducir el riesgo..." AcceptsReturn="True" Height="80" />
+
+                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
+                    <Button Content="Guardar Riesgo" Style="{StaticResource AccentButtonStyle}" Click="Save_Click" />
+                    <Button Content="Cancelar" Click="Back_Click" />
+                </StackPanel>
+                
+                <TextBlock x:Name="ErrorText" Foreground="#E81123" Visibility="Collapsed" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

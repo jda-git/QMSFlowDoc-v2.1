@@ -1,0 +1,54 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.ReagentEditorView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:QMSFlowDoc.Client.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="24" MaxWidth="600" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Click="Back_Click">
+                    <FontIcon Glyph="&#xE72B;" />
+                </Button>
+                <TextBlock Text="Nuevo Reactivo" Style="{StaticResource TitleTextBlockStyle}" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto" ColumnSpacing="16" RowSpacing="16">
+                <TextBox x:Name="NameBox" Header="Nombre del Reactivo" PlaceholderText="Ej: Etanol 70%" Grid.Row="0" Grid.ColumnSpan="2" />
+                
+                <TextBox x:Name="FluorescenceBox" Header="Fluorescencia (Monoclonal)" PlaceholderText="PE, FITC, etc." Grid.Row="1" Grid.Column="0" />
+                <TextBox x:Name="InternalCodeBox" Header="Código Interno" PlaceholderText="REA-001" Grid.Row="1" Grid.Column="1" />
+                
+                <TextBox x:Name="ManufacturerBox" Header="Fabricante" PlaceholderText="Sigma-Aldrich, etc." Grid.Row="2" Grid.Column="0" />
+                <ComboBox x:Name="TypeCombo" Header="Tipo de Reactivo" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="Químico" IsSelected="True" />
+                    <ComboBoxItem Content="Biológico" />
+                    <ComboBoxItem Content="Kit de Diagnóstico" />
+                    <ComboBoxItem Content="Consumible" />
+                </ComboBox>
+                
+                <ComboBox x:Name="StatusCombo" Header="Estado" Grid.Row="3" Grid.Column="0" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="ACTIVO" IsSelected="True" />
+                    <ComboBoxItem Content="EN_CAMBIO" />
+                    <ComboBoxItem Content="OBSOLETO" />
+                    <ComboBoxItem Content="BLOQUEADO" />
+                </ComboBox>
+                <TextBox x:Name="ReferenceBox" Header="Referencia (Código Fabricante)" PlaceholderText="Ref. Fab" Grid.Row="3" Grid.Column="1" />
+                
+                <NumberBox x:Name="MinStockBox" Header="Stock Mínimo" Value="5" Grid.Row="4" Grid.Column="0" />
+                <NumberBox x:Name="TargetStockBox" Header="Stock Objetivo" Value="20" Grid.Row="4" Grid.Column="1" />
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
+                <Button Content="Registrar Reactivo" Style="{StaticResource AccentButtonStyle}" Click="Save_Click" />
+                <Button Content="Cancelar" Click="Back_Click" />
+            </StackPanel>
+            
+            <TextBlock x:Name="ErrorText" Foreground="#E81123" Visibility="Collapsed" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

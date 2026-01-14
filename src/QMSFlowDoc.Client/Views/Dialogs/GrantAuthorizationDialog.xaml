@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="QMSFlowDoc.Client.Views.Dialogs.GrantAuthorizationDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Emitir Autorización Técnica"
+    PrimaryButtonText="Emitir"
+    CloseButtonText="Cancelar"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="16" MinWidth="450">
+        <!-- Nombre de la tarea autorizada - TEXTO LIBRE -->
+        <TextBox x:Name="TaskNameBox" 
+                 Header="Tarea / Procedimiento Autorizado"
+                 PlaceholderText="Ej: Operación de Citómetro, Validación de Resultados"
+                 HorizontalAlignment="Stretch"/>
+        
+        <TextBox x:Name="DescriptionBox" 
+                 Header="Descripción (Opcional)"
+                 PlaceholderText="Detalle de la autorización"
+                 HorizontalAlignment="Stretch"/>
+        
+        <!-- Fechas con Grid.Column asignado -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <CalendarDatePicker x:Name="FromDate" 
+                               Grid.Column="0"
+                               Header="Válido Desde" 
+                               HorizontalAlignment="Stretch" 
+                               PlaceholderText="Seleccione fecha"
+                               Margin="0,0,6,0"/>
+            <CalendarDatePicker x:Name="UntilDate" 
+                               Grid.Column="1"
+                               Header="Válido Hasta (Opcional)" 
+                               HorizontalAlignment="Stretch" 
+                               PlaceholderText="Sin vencimiento"
+                               Margin="6,0,0,0"/>
+        </Grid>
+        
+        <TextBlock Text="Nota: La emisión de la autorización implica que el personal ha demostrado la competencia necesaria." 
+                   Style="{StaticResource CaptionTextBlockStyle}" 
+                   Foreground="Gray" 
+                   TextWrapping="Wrap"/>
+    </StackPanel>
+</ContentDialog>

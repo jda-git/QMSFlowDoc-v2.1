@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="QMSFlowDoc.Client.Views.FirstRunWizard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Background="{ThemeResource AccentFillColorDefaultBrush}" Padding="32,24">
+            <TextBlock Text="Configuración Inicial - QMS FlowDoc" 
+                       Style="{StaticResource TitleTextBlockStyle}"
+                       Foreground="White"/>
+            <TextBlock x:Name="StepTitle" 
+                       Text="Bienvenido" 
+                       FontSize="16" 
+                       Foreground="White" 
+                       Opacity="0.9"
+                       Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <!-- Content Area -->
+        <ScrollViewer Grid.Row="1" Padding="48,32">
+            <StackPanel x:Name="ContentPanel" MaxWidth="700" Spacing="24">
+                
+                <!-- Page 1: Welcome -->
+                <StackPanel x:Name="Page1" Visibility="Visible" Spacing="20">
+                    <FontIcon Glyph="&#xE946;" FontSize="64" Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Bienvenido a QMS FlowDoc" 
+                               Style="{StaticResource SubtitleTextBlockStyle}" 
+                               HorizontalAlignment="Center"/>
+                    <TextBlock TextWrapping="Wrap" TextAlignment="Center" Foreground="Gray">
+                        Este asistente te guiará en la configuración inicial del sistema de gestión documental.
+                        Configurarás las rutas de almacenamiento para sincronizar documentos entre una carpeta de red y una copia local.
+                    </TextBlock>
+                    
+                    <InfoBar Title="Requisitos previos" Severity="Informational" IsOpen="True" Margin="0,16,0,0">
+                        <InfoBar.Content>
+                            <StackPanel Spacing="8">
+                                <TextBlock TextWrapping="Wrap">• Acceso a una carpeta compartida de red (UNC) con permisos lectura/escritura</TextBlock>
+                                <TextBlock TextWrapping="Wrap">• Espacio en disco local (~500 MB recomendado para documentos)</TextBlock>
+                                <TextBlock TextWrapping="Wrap">• Aproximadamente 2 minutos para completar la configuración</TextBlock>
+                            </StackPanel>
+                        </InfoBar.Content>
+                    </InfoBar>
+                </StackPanel>
+
+                <!-- Page 2: Network Path -->
+                <StackPanel x:Name="Page2" Visibility="Collapsed" Spacing="20">
+                    <TextBlock Text="Configurar Ruta de Red" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                        Introduce la ruta UNC de la carpeta compartida que actuará como repositorio principal de documentos.
+                    </TextBlock>
+                    
+                    <TextBox x:Name="NetworkPathBox" 
+                             Header="Ruta de Red (UNC)" 
+                             PlaceholderText="\\SERVIDOR\QMSFlowDoc\QMS"
+                             TextChanged="NetworkPathBox_TextChanged"/>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Probar Conexión" Click="TestNetworkPath_Click"/>
+                        <ProgressRing x:Name="NetworkTestProgress" IsActive="False" Width="24" Height="24"/>
+                    </StackPanel>
+                    
+                    <TextBlock x:Name="NetworkTestResult" 
+                               TextWrapping="Wrap" 
+                               Visibility="Collapsed"/>
+                    
+                    <InfoBar x:Name="NetworkPathInfo" 
+                             Title="Ejemplos de rutas válidas" 
+                             Severity="Informational" 
+                             IsOpen="True">
+                        <InfoBar.Content>
+                            <StackPanel Spacing="4">
+                                <TextBlock>• \\192.168.1.100\QMSFlowDoc\QMS</TextBlock>
+                                <TextBlock>• \\fileserver\shared\QMS</TextBlock>
+                                <TextBlock>• \\SERVIDOR-01\Documentos\QMS</TextBlock>
+                            </StackPanel>
+                        </InfoBar.Content>
+                    </InfoBar>
+                </StackPanel>
+
+                <!-- Page 3: Local Path -->
+                <StackPanel x:Name="Page3" Visibility="Collapsed" Spacing="20">
+                    <TextBlock Text="Configurar Ruta Local" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                        Selecciona una carpeta local donde se almacenará una copia de trabajo de los documentos para acceso rápido.
+                    </TextBlock>
+                    
+                    <TextBox x:Name="LocalPathBox" 
+                             Header="Ruta Local (Workspace)" 
+                             PlaceholderText="C:\ProgramData\QMSFlowDoc\QMS"
+                             TextChanged="LocalPathBox_TextChanged"/>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Validar Ruta" Click="ValidateLocalPath_Click"/>
+                        <ProgressRing x:Name="LocalTestProgress" IsActive="False" Width="24" Height="24"/>
+                    </StackPanel>
+                    
+                    <TextBlock x:Name="LocalTestResult" 
+                               TextWrapping="Wrap" 
+                               Visibility="Collapsed"/>
+                    
+                    <InfoBar Title="Recomendación" Severity="Warning" IsOpen="True">
+                        <InfoBar.Content>
+                            <TextBlock TextWrapping="Wrap">
+                                Se recomienda usar una carpeta en C:\ProgramData\ para que sea accesible por todos los usuarios del sistema.
+                            </TextBlock>
+                        </InfoBar.Content>
+                    </InfoBar>
+                </StackPanel>
+
+                <!-- Page 4: Summary & Initialize -->
+                <StackPanel x:Name="Page4" Visibility="Collapsed" Spacing="20">
+                    <TextBlock Text="Resumen de Configuración" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    
+                    <StackPanel Spacing="12" Padding="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                            <FontIcon Grid.Row="0" Grid.Column="0" Glyph="&#xE774;" Foreground="Green"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Ruta de Red" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="SummaryNetworkPath" 
+                                       Grid.Row="1" 
+                                       Grid.Column="1" 
+                                       TextWrapping="Wrap" 
+                                       Foreground="Gray"/>
+                        </Grid>
+                        
+                        <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                        
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                            <FontIcon Grid.Row="0" Grid.Column="0" Glyph="&#xE8B7;" Foreground="Blue"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Ruta Local" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="SummaryLocalPath" 
+                                       Grid.Row="1" 
+                                       Grid.Column="1" 
+                                       TextWrapping="Wrap" 
+                                       Foreground="Gray"/>
+                        </Grid>
+                    </StackPanel>
+                    
+                    <Button x:Name="InitializeButton" 
+                            Content="Inicializar Sistema" 
+                            Click="Initialize_Click" 
+                            Style="{StaticResource AccentButtonStyle}"
+                            HorizontalAlignment="Stretch"
+                            Padding="16"/>
+                    
+                    <ProgressBar x:Name="InitProgress" IsIndeterminate="False" Visibility="Collapsed" Margin="0,8,0,0"/>
+                    <TextBlock x:Name="InitStatusText" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,8,0,0"/>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer Navigation -->
+        <Border Grid.Row="2" 
+                Background="{ThemeResource LayerFillColorDefaultBrush}" 
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" 
+                BorderThickness="0,1,0,0"
+                Padding="48,16">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <Button x:Name="BackButton" 
+                        Content="Atrás"
+                        Click="Back_Click"
+                        IsEnabled="False"/>
+                
+                <TextBlock x:Name="ProgressText" 
+                           Grid.Column="1" 
+                           Text="Paso 1 de 4" 
+                           VerticalAlignment="Center" 
+                           HorizontalAlignment="Center"
+                           Foreground="Gray"/>
+                
+                <Button x:Name="NextButton" 
+                        Grid.Column="2" 
+                        Content="Siguiente" 
+                        Click="Next_Click"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Margin="0,0,12,0"/>
+                
+                <Button x:Name="FinishButton" 
+                        Grid.Column="3" 
+                        Content="Finalizar" 
+                        Click="Finish_Click"
+                        Visibility="Collapsed"
+                        Style="{StaticResource AccentButtonStyle}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

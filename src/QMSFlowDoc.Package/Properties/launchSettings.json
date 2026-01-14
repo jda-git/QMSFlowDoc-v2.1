@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "QMSFlowDoc.Package (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "QMSFlowDoc.Package (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+using System;
+
+namespace QMSFlowDoc.Shared.Models;
+
+public class AuditLog
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public Guid? UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty; // e.g., "CREATE", "UPDATE", "REVOKE"
+    public string EntityType { get; set; } = string.Empty; // e.g., "StaffTraining", "Competency"
+    public Guid? EntityId { get; set; }
+    public string Details { get; set; } = string.Empty;
+    public string? Reason { get; set; } // Required for updates/revocations
+    public string? BeforeSnapshot { get; set; } // JSON
+    public string? AfterSnapshot { get; set; } // JSON
+    public string? IntegrityHash { get; set; } // SHA256 of event
+    public string MachineName { get; set; } = Environment.MachineName;
+}

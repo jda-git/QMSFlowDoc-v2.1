@@ -1,0 +1,62 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.StaffView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:QMSFlowDoc.Client.Views"
+    xmlns:dto="using:QMSFlowDoc.Shared.DTOs"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid Padding="24" RowDefinitions="Auto, *">
+        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,24">
+            <TextBlock Text="Personal y Formación" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+            <Button Content="Nueva Ficha de Personal" Style="{StaticResource AccentButtonStyle}" Click="AddStaff_Click" />
+            <Button Content="EDITAR FICHA" Click="EditStaff_Click" />
+            <Button Content="BORRAR FICHA" Click="DeleteStaff_Click" />
+            <Button Content="LIMPIAR REGISTROS" Click="PurgeUsers_Click" Foreground="Red" />
+        </StackPanel>
+
+        <ListView Grid.Row="1" x:Name="StaffList"
+                  ItemsSource="{x:Bind StaffMembers, Mode=OneWay}"
+                  SelectionMode="Single">
+            <ListView.HeaderTemplate>
+                <DataTemplate>
+                    <Grid Padding="12,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="100" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Nombre Completo" FontWeight="Bold" Grid.Column="0" />
+                        <TextBlock Text="Cargo" FontWeight="Bold" Grid.Column="1" />
+                        <TextBlock Text="Departamento" FontWeight="Bold" Grid.Column="2" />
+                        <TextBlock Text="Cursos" FontWeight="Bold" Grid.Column="3" />
+                        <TextBlock Text="Competencias" FontWeight="Bold" Grid.Column="4" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.HeaderTemplate>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="dto:StaffListDto">
+                    <Grid Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="100" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind FullName}" Grid.Column="0" />
+                        <TextBlock Text="{x:Bind PositionTitle}" Grid.Column="1" />
+                        <TextBlock Text="{x:Bind Department}" Grid.Column="2" />
+                        <TextBlock Text="{x:Bind TrainingCount.ToString()}" Grid.Column="3" HorizontalAlignment="Center" />
+                        <TextBlock Text="{x:Bind CompetencyPassCount.ToString()}" Grid.Column="4" HorizontalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</Page>

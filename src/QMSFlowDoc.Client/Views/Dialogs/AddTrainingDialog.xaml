@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="QMSFlowDoc.Client.Views.Dialogs.AddTrainingDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Registrar Formación"
+    PrimaryButtonText="Registrar"
+    CloseButtonText="Cancelar"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="16" MinWidth="450">
+        <TextBlock Text="Introduzca los datos de la formación completada." TextWrapping="Wrap"/>
+        
+        <!-- Título del curso - TEXTO LIBRE -->
+        <TextBox x:Name="TitleBox" 
+                 Header="Título del Curso / Actividad"
+                 PlaceholderText="Ej: Curso de Bioseguridad en el Laboratorio"
+                 HorizontalAlignment="Stretch"/>
+        
+        <!-- Proveedor -->
+        <TextBox x:Name="ProviderBox" 
+                 Header="Proveedor / Organizador"
+                 PlaceholderText="Ej: AENOR, Universidad, Interno"
+                 HorizontalAlignment="Stretch"/>
+        
+        <!-- Fechas en Grid con columnas asignadas -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <CalendarDatePicker x:Name="CompletionDatePicker"
+                               Grid.Column="0"
+                               Header="Fecha de Finalización"
+                               PlaceholderText="Seleccione fecha"
+                               HorizontalAlignment="Stretch"
+                               Margin="0,0,6,0"/>
+            <TextBox x:Name="HoursBox"
+                     Grid.Column="1"
+                     Header="Horas"
+                     PlaceholderText="Ej: 20"
+                     HorizontalAlignment="Stretch"
+                     Margin="6,0,0,0"/>
+        </Grid>
+        
+        <ComboBox x:Name="ResultCombo"
+                  Header="Resultado"
+                  HorizontalAlignment="Stretch"
+                  SelectedIndex="0">
+            <ComboBoxItem Content="APTO" Tag="APTO"/>
+            <ComboBoxItem Content="NO APTO" Tag="NO_APTO"/>
+        </ComboBox>
+        
+        <TextBox x:Name="NotesBox"
+                 Header="Notas (Opcional)"
+                 PlaceholderText="Observaciones adicionales"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 Height="80"/>
+    </StackPanel>
+</ContentDialog>

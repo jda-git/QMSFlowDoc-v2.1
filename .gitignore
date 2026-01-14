@@ -1,0 +1,147 @@
+# .NET / C# Build Results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.userprefs
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# MSBuild
+*.log
+*.binlog
+msbuild_output.txt
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+TestResult.xml
+
+# NCrunch
+_NCrunch_*
+.*crunch*.local.xml
+nCrunchTemp_*
+
+# DocProject
+DocProject/buildhelp/
+DocProject/Help/*.HxT
+DocProject/Help/*.HxC
+DocProject/Help/*.hhc
+DocProject/Help/*.hhk
+DocProject/Help/*.hhp
+DocProject/Help/Html2
+DocProject/Help/html
+
+# Dotcover
+*.dotCover
+
+# Publish output
+[Pp]ublish/
+
+# NuGet package restore
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Windows App SDK / WinUI
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.appxupload
+*.msixupload
+
+# Runtime MSBuild
+Generated Files/
+*.GeneratedMSBuildEditorConfig.editorconfig
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Sensitive/Secret files (DO NOT COMMIT)
+appsettings.Development.json
+appsettings.Local.json
+client_secret*.json
+*.pem
+*.key
+secrets/
+
+# SQLite local database
+*.db
+*.sqlite
+*.sqlite3
+
+# PostgreSQL local files
+*.sql.backup
+
+# Logs and build outputs
+*.log
+build*.txt
+*_output.txt
+xaml_error.log
+
+# Windows Installer
+WindowsAppRuntimeInstall*.exe
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# Office temporary files
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# macOS
+.DS_Store
+
+# Thumbs.db (Windows)
+Thumbs.db
+ehthumbs.db
+
+# Miscellaneous project-specific
+Documentos/
+QMS/
+descargas/
+backend/
+frontend/
+shared/
+*.pdf

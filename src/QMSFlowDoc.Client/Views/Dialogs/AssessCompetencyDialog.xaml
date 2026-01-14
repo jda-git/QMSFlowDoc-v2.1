@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="QMSFlowDoc.Client.Views.Dialogs.AssessCompetencyDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Evaluar Competencia"
+    PrimaryButtonText="Registrar Evaluación"
+    CloseButtonText="Cancelar"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="16" MinWidth="450">
+        <!-- Nombre de la competencia - TEXTO LIBRE -->
+        <TextBox x:Name="CompetencyNameBox" 
+                 Header="Nombre de la Competencia"
+                 PlaceholderText="Ej: Manejo de Citómetro de Flujo"
+                 HorizontalAlignment="Stretch"/>
+        
+        <TextBox x:Name="AreaBox" 
+                 Header="Área"
+                 PlaceholderText="Ej: Analítica, Preanalítica, Postanalítica"
+                 HorizontalAlignment="Stretch"/>
+        
+        <!-- Fechas con Grid.Column asignado -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <CalendarDatePicker x:Name="EvalDate" 
+                               Grid.Column="0"
+                               Header="Fecha de Evaluación" 
+                               HorizontalAlignment="Stretch" 
+                               PlaceholderText="Seleccione fecha"
+                               Margin="0,0,6,0"/>
+            <CalendarDatePicker x:Name="ExpiryDate" 
+                               Grid.Column="1"
+                               Header="Válido Hasta (Opcional)" 
+                               HorizontalAlignment="Stretch" 
+                               PlaceholderText="Sin vencimiento"
+                               Margin="6,0,0,0"/>
+        </Grid>
+        
+        <ComboBox x:Name="OutcomeCombo" 
+                  Header="Resultado de la Evaluación" 
+                  HorizontalAlignment="Stretch" 
+                  SelectedIndex="0">
+            <ComboBoxItem Content="COMPETENTE" Tag="PASS"/>
+            <ComboBoxItem Content="NO COMPETENTE" Tag="FAIL"/>
+            <ComboBoxItem Content="EN FORMACIÓN" Tag="CONDITIONAL"/>
+        </ComboBox>
+
+        <TextBox x:Name="EvidenceBox"
+                 Header="Evidencia / Hallazgos"
+                 PlaceholderText="Detalle de la evaluación, muestras revisadas, etc."
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 Height="100"/>
+    </StackPanel>
+</ContentDialog>

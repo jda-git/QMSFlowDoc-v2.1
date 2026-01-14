@@ -1,0 +1,6 @@
+TRUNCATE TABLE "DocumentVersions" CASCADE;
+TRUNCATE TABLE "Documents" CASCADE;
+TRUNCATE TABLE "Folders" CASCADE;
+
+INSERT INTO "Folders" ("Id", "Name", "ParentFolderId", "CreatedAt")
+VALUES ('00000000-0000-0000-0000-000000000001', 'General', NULL, NOW());

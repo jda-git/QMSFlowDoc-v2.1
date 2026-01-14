@@ -1,0 +1,45 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.ReviewEditorView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:QMSFlowDoc.Client.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="24" MaxWidth="600" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Click="Back_Click">
+                    <FontIcon Glyph="&#xE72B;" />
+                </Button>
+                <TextBlock Text="Acta de Revisión por Dirección" Style="{StaticResource TitleTextBlockStyle}" />
+            </StackPanel>
+
+            <StackPanel Spacing="16">
+                <DatePicker x:Name="ReviewDatePicker" Header="Fecha de Revisión" />
+                
+                <TextBox x:Name="ParticipantsBox" Header="Participantes" PlaceholderText="Lista de asistentes..." AcceptsReturn="True" Height="60" />
+                <TextBox x:Name="AgendaBox" Header="Agenda / Temas" PlaceholderText="Temas tratados..." AcceptsReturn="True" Height="80" />
+                <TextBox x:Name="SummaryBox" Header="Resumen / Decisiones" PlaceholderText="Principales conclusiones..." AcceptsReturn="True" Height="100" />
+                <TextBox x:Name="ActionsBox" Header="Acciones Acordadas" PlaceholderText="Plan de acción..." AcceptsReturn="True" Height="60" />
+
+                <Grid RowDefinitions="Auto, Auto" RowSpacing="8">
+                    <TextBlock Text="Acta Firmada (PDF)" FontWeight="SemiBold" />
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+                        <Button Content="Seleccionar Archivo (PDF/Word)" Click="UploadMinutes_Click" />
+                        <TextBlock x:Name="FileNameText" VerticalAlignment="Center" Foreground="Gray" Text="Ningún archivo seleccionado" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
+                    <Button Content="Guardar Acta" Style="{StaticResource AccentButtonStyle}" Click="Save_Click" />
+                    <Button Content="Cancelar" Click="Back_Click" />
+                </StackPanel>
+                
+                <TextBlock x:Name="ErrorText" Foreground="#E81123" Visibility="Collapsed" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
