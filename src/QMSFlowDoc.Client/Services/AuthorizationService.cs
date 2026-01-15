@@ -19,32 +19,76 @@ public class AuthorizationService : IAuthorizationService
 {
     private readonly HttpClient _httpClient;
 
-    public AuthorizationService(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
-
     public async Task<IEnumerable<AuthorizationDto>> GetCatalogAsync()
     {
-        return await _httpClient.GetFromJsonAsync<IEnumerable<AuthorizationDto>>("authorizations/catalog")
-               ?? new List<AuthorizationDto>();
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<IEnumerable<AuthorizationDto>>("authorizations/catalog")
+                   ?? new List<AuthorizationDto>();
+        }
+        catch { return new List<AuthorizationDto>(); }
     }
 
     public async Task<IEnumerable<StaffAuthorizationDto>> GetStaffAuthorizationsAsync(Guid staffId)
     {
-        return await _httpClient.GetFromJsonAsync<IEnumerable<StaffAuthorizationDto>>($"authorizations/staff/{staffId}")
-               ?? new List<StaffAuthorizationDto>();
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<IEnumerable<StaffAuthorizationDto>>($"authorizations/staff/{staffId}")
+                   ?? new List<StaffAuthorizationDto>();
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetStaffAuthorizationsAsync(staffId);
+        }
     }
 
     public async Task<bool> GrantAuthorizationAsync(GrantAuthorizationRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("authorizations/grant", request);
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("authorizations/grant", request);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            await store.GrantAuthorizationAsync(request);
+            return true;
+        }
     }
 
     public async Task<bool> DeleteAuthorizationAsync(Guid authorizationId)
     {
-        var response = await _httpClient.DeleteAsync($"authorizations/{authorizationId}");
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"authorizations/{authorizationId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.DeleteAuthorizationAsync(authorizationId);
+        }
+    }
+
+    // Needed for accessing local store
+    private readonly NetworkConfigStore _networkConfig;
+    private LocalDocumentStore? _localStore;
+
+    public AuthorizationService(HttpClient httpClient, NetworkConfigStore networkConfig)
+    {
+        _httpClient = httpClient;
+        _networkConfig = networkConfig;
+    }
+
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
+        {
+            _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
+        }
+        return _localStore;
     }
 }

@@ -94,14 +94,6 @@
                     </StackPanel>
                 </Expander>
             </StackPanel>
-
-            <!-- Document Settings -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Gestión Documental" Style="{StaticResource SubtitleTextBlockStyle}" />
-                <TextBox x:Name="DefaultPathBox" Header="Ruta Predeterminada de Documentos" 
-                         PlaceholderText="Ej: C:\QMS\Documents (Virtual Folder ID)" />
-                <Button Content="Guardar Configuración" Click="SaveSettings_Click" />
-            </StackPanel>
             
             <TextBlock x:Name="StatusText" Foreground="Green" />
         </StackPanel>

@@ -273,6 +273,9 @@ public sealed partial class MainWindow : Window
             case "personal":
                 ContentFrame.Navigate(typeof(Views.StaffView));
                 break;
+            case "eqa":
+                ContentFrame.Navigate(typeof(Views.EQAView));
+                break;
             case "improvement":
                 ContentFrame.Navigate(typeof(Views.ImprovementView));
                 break;

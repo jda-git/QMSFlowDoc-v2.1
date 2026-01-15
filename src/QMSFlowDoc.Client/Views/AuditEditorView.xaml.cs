@@ -213,7 +213,13 @@ public sealed partial class AuditEditorView : Page
                 if (reportType == null) throw new Exception("No se encontraron tipos de documentos configurados.");
 
                 // Lookup Folder
-                var folderId = await docService.GetOrCreateFolderIdAsync("AUDITORIA"); // This may be null, which is fine (Root)
+                var folderId = await docService.GetOrCreateFolderIdAsync("AUDITORIA");
+                
+                if (folderId == null)
+                {
+                    FileNameText.Text = "Error: No se pudo crear/encontrar la carpeta 'AUDITORIA'.";
+                    return;
+                }
 
                 // 2. Create Document Metadata
                 var createReq = new CreateDocumentRequest(

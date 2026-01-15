@@ -61,7 +61,13 @@ public sealed partial class ReviewEditorView : Page
                 if (reportType == null) throw new Exception("No se encontraron tipos de documentos configurados.");
 
                 // Lookup Folder
-                var folderId = await docService.GetOrCreateFolderIdAsync("AUDITORIA"); // Using same folder for now or change to REVIEWS if needed
+                var folderId = await docService.GetOrCreateFolderIdAsync("AUDITORIA"); 
+                
+                if (folderId == null)
+                {
+                    FileNameText.Text = "Error: No se pudo crear/encontrar la carpeta 'AUDITORIA'.";
+                    return;
+                }
 
                 var createReq = new CreateDocumentRequest(
                    DocCode: "REV-" + DateTime.Now.Ticks.ToString().Substring(10),

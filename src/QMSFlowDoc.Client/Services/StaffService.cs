@@ -24,73 +24,176 @@ public interface IStaffService
 public class StaffService : IStaffService
 {
     private readonly HttpClient _httpClient;
+    private LocalDocumentStore? _localStore;
+    private readonly NetworkConfigStore _networkConfig;
+    private bool _useLocalMode = false;
 
-    public StaffService(HttpClient httpClient)
+    public StaffService(HttpClient httpClient, LocalDocumentStore? localStore = null, NetworkConfigStore? networkConfig = null)
     {
         _httpClient = httpClient;
+        _localStore = localStore;
+        _networkConfig = networkConfig ?? new NetworkConfigStore();
+    }
+    
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
+        {
+            _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
+        }
+        return _localStore;
     }
 
     public async Task<IEnumerable<StaffListDto>> GetStaffAsync()
     {
-        return await _httpClient.GetFromJsonAsync<IEnumerable<StaffListDto>>("staff")
-               ?? new List<StaffListDto>();
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<IEnumerable<StaffListDto>>("staff")
+                   ?? new List<StaffListDto>();
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetStaffProfilesAsync();
+        }
     }
 
     public async Task<StaffProfile?> GetStaffProfileByIdAsync(Guid id)
     {
-        return await _httpClient.GetFromJsonAsync<StaffProfile>($"staff/{id}");
+        try { return await _httpClient.GetFromJsonAsync<StaffProfile>($"staff/{id}"); }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetStaffProfileByIdAsync(id);
+        }
     }
 
     public async Task<StaffProfileDetailDto?> GetStaffDetailsAsync(Guid id)
     {
-        return await _httpClient.GetFromJsonAsync<StaffProfileDetailDto>($"staff/{id}/details");
+        try { return await _httpClient.GetFromJsonAsync<StaffProfileDetailDto>($"staff/{id}/details"); }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetStaffProfileDetailsAsync(id);
+        }
     }
-
     public async Task<StaffProfile?> CreateStaffProfileAsync(CreateStaffProfileRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("staff", request);
-        if (response.IsSuccessStatusCode)
+        try
         {
-            return await response.Content.ReadFromJsonAsync<StaffProfile>();
+            var response = await _httpClient.PostAsJsonAsync("staff", request);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<StaffProfile>() : null;
         }
-        
-        var error = await response.Content.ReadAsStringAsync();
-        throw new Exception(string.IsNullOrWhiteSpace(error) ? $"Error del servidor: {response.StatusCode}" : error);
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            var profile = new StaffProfile
+            {
+                Id = Guid.NewGuid(),
+                UserId = request.UserId,
+                PositionTitle = request.PositionTitle,
+                Department = request.Department,
+                HiredAt = request.HiredAt,
+                IsActive = true
+            };
+            await store.CreateStaffProfileAsync(profile);
+            return profile;
+        }
     }
 
     public async Task<StaffProfile?> UpdateStaffProfileAsync(UpdateStaffProfileRequest request)
     {
-        var response = await _httpClient.PutAsJsonAsync($"staff/{request.Id}", request);
-        if (response.IsSuccessStatusCode)
+        try
         {
-            return await response.Content.ReadFromJsonAsync<StaffProfile>();
+            var response = await _httpClient.PutAsJsonAsync($"staff/{request.Id}", request);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<StaffProfile>() : null;
         }
-
-        var error = await response.Content.ReadAsStringAsync();
-        throw new Exception(string.IsNullOrWhiteSpace(error) ? $"Error del servidor: {response.StatusCode}" : error);
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            var profile = new StaffProfile
+            {
+                Id = request.Id,
+                PositionTitle = request.PositionTitle,
+                Department = request.Department,
+                HiredAt = request.HiredAt,
+                IsActive = request.IsActive
+            };
+            await store.UpdateStaffProfileAsync(profile);
+            return profile;
+        }
     }
 
     public async Task<bool> DeleteStaffProfileAsync(Guid id)
     {
-        var response = await _httpClient.DeleteAsync($"staff/{id}");
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"staff/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.DeleteStaffProfileAsync(id);
+        }
     }
 
     public async Task<bool> RegisterTrainingAsync(RegisterTrainingRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("staff/training", request);
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("staff/training", request);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            await store.RegisterTrainingAsync(
+                request.StaffId, 
+                request.Title, 
+                request.Provider, 
+                request.Hours, 
+                request.CompletedAt, 
+                request.Result, 
+                request.Notes);
+            return true;
+        }
     }
 
     public async Task<bool> DeleteTrainingAsync(Guid trainingId)
     {
-        var response = await _httpClient.DeleteAsync($"staff/training/{trainingId}");
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"staff/training/{trainingId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.DeleteTrainingAsync(trainingId);
+        }
     }
 
     public async Task<CompetencyEvaluation?> AssessCompetencyAsync(AssessCompetencyRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("staff/assess", request);
-        return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<CompetencyEvaluation>() : null;
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("staff/competency", request);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<CompetencyEvaluation>() : null;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            await store.AssessCompetencyAsync(request);
+            // Construct basic return object
+            return new CompetencyEvaluation
+            {
+                Id = Guid.NewGuid(),
+                StaffId = request.StaffId,
+                EvaluationDate = request.EvaluationDate,
+                Outcome = request.Outcome.ToString()
+            };
+        }
     }
 }

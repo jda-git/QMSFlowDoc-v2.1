@@ -20,6 +20,7 @@ public interface IAuthService
     void Logout();
     string? CurrentToken { get; }
     string? CurrentUsername { get; }
+    Guid? CurrentUserId { get; }
     List<string> CurrentRoles { get; }
     bool IsAuthenticated { get; }
     bool IsAdmin { get; }
@@ -28,19 +29,35 @@ public interface IAuthService
 public class AuthService : IAuthService
 {
     private readonly HttpClient _httpClient;
+    private LocalDocumentStore? _localStore;
+    private readonly NetworkConfigStore _networkConfig;
+    
     public string? CurrentToken { get; private set; }
     public string? CurrentUsername { get; private set; }
+    public Guid? CurrentUserId { get; private set; }
     public List<string> CurrentRoles { get; private set; } = new();
-    public bool IsAuthenticated => !string.IsNullOrEmpty(CurrentToken);
+    public bool IsAuthenticated => !string.IsNullOrEmpty(CurrentToken) || !string.IsNullOrEmpty(CurrentUsername);
     public bool IsAdmin => CurrentRoles.Contains("Administrador");
 
     public AuthService(HttpClient httpClient)
     {
         _httpClient = httpClient;
+        _networkConfig = new NetworkConfigStore();
+    }
+    
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
+        {
+            _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
+        }
+        return _localStore;
     }
 
     public async Task<bool> LoginAsync(string username, string password)
     {
+        // First try API authentication
         try
         {
             var response = await _httpClient.PostAsJsonAsync("auth/login", new LoginRequest(username, password));
@@ -51,18 +68,40 @@ public class AuthService : IAuthService
                 {
                     CurrentToken = result.Token;
                     CurrentUsername = username;
+                    CurrentUserId = null; // API mode doesn't give us ID easily yet
                     CurrentRoles = result.Roles ?? new List<string>();
                     _httpClient.DefaultRequestHeaders.Authorization = 
                         new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CurrentToken);
                     return true;
                 }
             }
-            return false;
         }
         catch
         {
-            return false;
+            // API not available, try local authentication
         }
+        
+        // Fallback to local SQLite authentication
+        try
+        {
+            var localStore = await GetLocalStoreAsync();
+            var (success, userId, fullName, role) = await localStore.ValidateUserAsync(username, password);
+            
+            if (success)
+            {
+                CurrentToken = $"local_{userId}"; // Pseudo-token for local mode
+                CurrentUsername = username;
+                CurrentUserId = Guid.Parse(userId);
+                CurrentRoles = new List<string> { role };
+                return true;
+            }
+        }
+        catch
+        {
+            // Local auth also failed
+        }
+        
+        return false;
     }
 
     public async Task<Guid?> RegisterAsync(RegisterRequest request)
@@ -86,9 +125,19 @@ public class AuthService : IAuthService
             }
             return null;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            throw new Exception($"Error en el registro: {ex.Message}");
+            // API failure, try local
+            try
+            {
+                var store = await GetLocalStoreAsync();
+                return await store.CreateUserAsync(request.Username, request.Password, request.FullName, request.Email, request.RoleName);
+            }
+            catch (Exception localEx)
+            {
+                // Both failed
+                throw new Exception($"Error en el registro local: {localEx.Message}");
+            }
         }
     }
 

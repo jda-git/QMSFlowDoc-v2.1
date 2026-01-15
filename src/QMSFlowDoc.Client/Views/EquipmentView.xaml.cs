@@ -192,7 +192,8 @@ public sealed partial class EquipmentView : Page
                 null, // EvidenceDocId - removed
                 hasIssues,
                 nextMaintMonth,
-                nextMaintYear
+                nextMaintYear,
+                _authService.CurrentUserId // UserId
             );
 
             try
@@ -201,13 +202,15 @@ public sealed partial class EquipmentView : Page
                 {
                     var updateReq = new UpdateMaintenanceRequest(
                         _editingMaintenanceId.Value,
+                        selectedEq.Id,
                         maintDate,
                         type,
                         outcome,
                         MaintNotesBox.Text,
                         hasIssues,
                         nextMaintMonth,
-                        nextMaintYear
+                        nextMaintYear,
+                        _authService.CurrentUserId
                     );
                     await _equipmentService.UpdateMaintenanceAsync(updateReq);
                 }
@@ -226,6 +229,7 @@ public sealed partial class EquipmentView : Page
                     actionLabel,
                     selectedEq.Name,
                     $"Tipo: {type}, Resultado: {outcome}, Incidencias: {hasIssues}",
+                    _authService.CurrentUserId?.ToString(),
                     userName
                 );
             }
@@ -256,7 +260,8 @@ public sealed partial class EquipmentView : Page
                         dialog.LotNumber,
                         dialog.IsPass,
                         dialog.Notes,
-                        dialog.PerformedAt
+                        dialog.PerformedAt,
+                        _authService.CurrentUserId // UserId
                      );
 
                      var success = await _equipmentService.RegisterDailyQCAsync(req);
@@ -304,6 +309,7 @@ public sealed partial class EquipmentView : Page
                 "Editar Equipo",
                 selected.Name,
                 $"ID: {selected.Id}",
+                _authService.CurrentUserId?.ToString(),
                 userName
             );
             Frame.Navigate(typeof(EquipmentEditorView), selected.Id);
@@ -343,6 +349,7 @@ public sealed partial class EquipmentView : Page
                         "Eliminar Equipo",
                         selected.Name,
                         $"Etiqueta: {selected.AssetTag}",
+                        _authService.CurrentUserId?.ToString(),
                         userName
                     );
                     await LoadEquipment();

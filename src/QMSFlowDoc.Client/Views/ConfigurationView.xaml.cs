@@ -33,13 +33,6 @@ public sealed partial class ConfigurationView : Page
         _types = new List<ReagentType>(types);
         ReagentTypesList.ItemsSource = _types;
 
-        // Load Document Settings
-        var setting = await service.GetSettingAsync("DefaultDocumentPath");
-        if (setting != null)
-        {
-            DefaultPathBox.Text = setting.Value;
-        }
-
         // Load Network Storage Configuration
         var app = (App)Application.Current;
         var networkPath = await app.NetworkConfigStore.GetNetworkBasePathAsync();
@@ -226,30 +219,6 @@ public sealed partial class ConfigurationView : Page
         catch (Exception ex)
         {
             StatusText.Text = $"Error al abrir logs: {ex.Message}";
-            StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red);
-        }
-    }
-
-    // Document Settings
-    
-    private async void SaveSettings_Click(object sender, RoutedEventArgs e)
-    {
-        var service = ((App)Application.Current).ConfigurationService;
-        var setting = new SystemSetting 
-        { 
-            Key = "DefaultDocumentPath", 
-            Value = DefaultPathBox.Text,
-            Description = "Ruta o ID de carpeta por defecto"
-        };
-        
-        if (await service.UpdateSettingAsync(setting))
-        {
-            StatusText.Text = "Configuración guardada.";
-            StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green);
-        }
-        else
-        {
-            StatusText.Text = "Error al guardar.";
             StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red);
         }
     }

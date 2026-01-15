@@ -70,18 +70,21 @@ public record RegisterMaintenanceRequest(
     Guid? EvidenceDocId,
     bool? HasIssues,
     int? NextMaintenanceMonth,
-    int? NextMaintenanceYear
+    int? NextMaintenanceYear,
+    Guid? UserId = null // Added for local tracking
 );
 
 public record UpdateMaintenanceRequest(
     Guid Id,
+    Guid EquipmentId,
     DateTime? PerformedAt,
     MaintenanceEventType EventType,
     string? Outcome,
     string? Notes,
     bool? HasIssues,
     int? NextMaintenanceMonth,
-    int? NextMaintenanceYear
+    int? NextMaintenanceYear,
+    Guid? PerformedByUserId
 );
 
 public record CreateDailyQCRequest(
@@ -89,7 +92,8 @@ public record CreateDailyQCRequest(
     string LotNumber,
     bool IsPass,
     string? Notes,
-    DateTime PerformedAt
+    DateTime PerformedAt,
+    Guid? UserId = null // Added for local tracking
 );
 
 public record EquipmentDailyQCDto(

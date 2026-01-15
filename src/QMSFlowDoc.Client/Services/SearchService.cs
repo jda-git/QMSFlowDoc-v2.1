@@ -15,10 +15,24 @@ public interface ISearchService
 public class SearchService : ISearchService
 {
     private readonly HttpClient _httpClient;
+    private readonly NetworkConfigStore _networkConfig;
+    private LocalDocumentStore? _localStore;
 
-    public SearchService(HttpClient httpClient)
+    public SearchService(HttpClient httpClient, LocalDocumentStore? localStore = null, NetworkConfigStore? networkConfig = null)
     {
         _httpClient = httpClient;
+        _networkConfig = networkConfig ?? new NetworkConfigStore();
+        _localStore = localStore;
+    }
+
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
+        {
+            _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
+        }
+        return _localStore;
     }
 
     public async Task<IEnumerable<SearchResultDto>> SearchAsync(string query)
@@ -30,7 +44,8 @@ public class SearchService : ISearchService
         }
         catch
         {
-            return new List<SearchResultDto>();
+            var store = await GetLocalStoreAsync();
+            return await store.SearchAsync(query);
         }
     }
 }

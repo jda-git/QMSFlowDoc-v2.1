@@ -43,29 +43,39 @@ public partial class App : Application
     public Services.NetworkConfigStore NetworkConfigStore { get; } = new Services.NetworkConfigStore();
     public Services.LocalConfigStore LocalConfigStore { get; } = new Services.LocalConfigStore();
     
+    // Core Data Store
+    public Services.LocalDocumentStore LocalStore { get; }
+
+    public Services.IEQAService EQAService { get; }
+
     private System.Threading.Timer? _syncTimer;
 
     public App()
     {
         this.InitializeComponent();
         
-        var httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:5000/api/") };
+        // Base API address (Optional in Local-First mode; services will fallback to SQLite if unavailable)
+        var httpClient = new HttpClient { BaseAddress = new Uri("http://offline-mode-active/api/") };
         
+        // Init Shared Stores
+        LocalStore = new Services.LocalDocumentStore(NetworkConfigStore);
+
         AuthService = new Services.AuthService(httpClient);
-        DocumentService = new Services.DocumentService(httpClient, LocalCacheService);
-        InventoryService = new Services.InventoryService(httpClient);
-        EquipmentService = new Services.EquipmentService(httpClient);
-        StaffService = new Services.StaffService(httpClient);
-        QualityService = new Services.QualityService(httpClient);
-        ImprovementService = new Services.ImprovementService(httpClient);
-        DashboardService = new Services.DashboardService(httpClient);
-        SearchService = new Services.SearchService(httpClient);
-        FolderService = new Services.FolderService(httpClient);
-        ConfigurationService = new Services.ConfigurationService(httpClient);
-        TrainingService = new Services.TrainingService(httpClient);
-        CompetencyService = new Services.CompetencyService(httpClient);
-        AuthorizationService = new Services.AuthorizationService(httpClient);
-        EquipmentAuditLogger = new Services.AuditLogger(ConfigurationService); 
+        DocumentService = new Services.DocumentService(httpClient, LocalCacheService, LocalStore, NetworkConfigStore);
+        InventoryService = new Services.InventoryService(httpClient, null, NetworkConfigStore);
+        EquipmentService = new Services.EquipmentService(httpClient, null, NetworkConfigStore);
+        StaffService = new Services.StaffService(httpClient, null, NetworkConfigStore);
+        QualityService = new Services.QualityService(httpClient, null, NetworkConfigStore);
+        ImprovementService = new Services.ImprovementService(httpClient, NetworkConfigStore);
+        DashboardService = new Services.DashboardService(httpClient, null, NetworkConfigStore);
+        SearchService = new Services.SearchService(httpClient, null, NetworkConfigStore);
+        FolderService = new Services.FolderService(httpClient, null, NetworkConfigStore);
+        ConfigurationService = new Services.ConfigurationService(httpClient, NetworkConfigStore);
+        TrainingService = new Services.TrainingService(httpClient, null, NetworkConfigStore);
+        CompetencyService = new Services.CompetencyService(httpClient, NetworkConfigStore);
+        AuthorizationService = new Services.AuthorizationService(httpClient, NetworkConfigStore);
+        EQAService = new Services.EQAService(LocalStore);
+        EquipmentAuditLogger = new Services.AuditLogger(ConfigurationService, NetworkConfigStore); 
         
         // Init Sync Infrastructure
         SnapshotStore = new Services.Sync.SnapshotStore();
@@ -101,6 +111,9 @@ public partial class App : Application
             await SnapshotStore.InitializeAsync();
             await PrintControlService.InitializeAsync(); // Init PrintLog database
             
+            // Initialize Core Store explicitly
+            await LocalStore.InitializeAsync();
+
             // Initialize LocalDocumentStore if using local mode
             // Initialize LocalDocumentStore via Service (explicit call)
             await DocumentService.InitializeAsync();

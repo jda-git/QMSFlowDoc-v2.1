@@ -40,48 +40,52 @@ public class DocumentService : IDocumentService
 {
     private readonly HttpClient _httpClient;
     private readonly ILocalCacheService _cacheService;
-    private readonly LocalDocumentStore? _localStore;
     private readonly NetworkConfigStore _networkConfig;
-    private bool _useLocalMode = false;
+    private LocalDocumentStore? _localStore;
 
-    public DocumentService(HttpClient httpClient, ILocalCacheService cacheService, LocalDocumentStore? localStore = null)
+    public DocumentService(HttpClient httpClient, ILocalCacheService cacheService, LocalDocumentStore? localStore = null, NetworkConfigStore? networkConfig = null)
     {
         _httpClient = httpClient;
         _cacheService = cacheService;
-        _networkConfig = new NetworkConfigStore();
+        _networkConfig = networkConfig ?? new NetworkConfigStore();
         _localStore = localStore;
-        
-        // Initialize status
-        CheckConnectionAsync().Wait(500);
+    }
 
-        // Initialize local store if needed and not provided (legacy fallback, but should rely on injection)
-        if (_useLocalMode && _localStore == null)
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
         {
             _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
         }
+        return _localStore;
     }
     
-    public bool IsLocalMode => _useLocalMode;
+    public bool IsLocalMode => true; // Potentially dynamic but hybrid handles it
 
     private async Task CheckConnectionAsync()
     {
-        try
-        {
-            using var cts = new System.Threading.CancellationTokenSource(2000);
-            var response = await _httpClient.GetAsync("health", cts.Token);
-            _useLocalMode = !response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            _useLocalMode = true;
-        }
+        // This method is no longer used in the new hybrid approach
+        // The try-catch blocks in each method handle the connection status implicitly.
     }
 
     public async Task<IEnumerable<DocumentDto>> GetDocumentsAsync(bool includeObsolete = false)
     {
-        if (_useLocalMode && _localStore != null)
+        try
         {
-            var docs = await _localStore.GetAllDocumentsAsync(includeObsolete);
+            var url = includeObsolete ? "documents?includeObsolete=true" : "documents";
+            var documents = await _httpClient.GetFromJsonAsync<IEnumerable<DocumentDto>>(url) 
+                           ?? new List<DocumentDto>();
+            
+            // Update cache in background
+            _ = _cacheService.CacheDocumentsAsync(documents);
+            
+            return documents;
+        }
+        catch // Offline or Server Error
+        {
+            var store = await GetLocalStoreAsync();
+            var docs = await store.GetAllDocumentsAsync(includeObsolete);
             var docDtos = new List<DocumentDto>();
             
             foreach (var d in docs)
@@ -89,7 +93,7 @@ public class DocumentService : IDocumentService
                 string? typeName = null;
                 if (d.DocumentTypeId.HasValue)
                 {
-                     var type = await _localStore.GetDocumentTypeByIdAsync(d.DocumentTypeId.Value);
+                     var type = await store.GetDocumentTypeByIdAsync(d.DocumentTypeId.Value);
                      typeName = type?.Name;
                 }
 
@@ -115,45 +119,33 @@ public class DocumentService : IDocumentService
             }
             return docDtos;
         }
-        
-        try
-        {
-            var url = includeObsolete ? "documents?includeObsolete=true" : "documents";
-            var documents = await _httpClient.GetFromJsonAsync<IEnumerable<DocumentDto>>(url) 
-                           ?? new List<DocumentDto>();
-            
-            // Update cache in background
-            _ = _cacheService.CacheDocumentsAsync(documents);
-            
-            return documents;
-        }
-        catch // Offline or Server Error
-        {
-            return await _cacheService.GetCachedDocumentsAsync();
-        }
     }
 
     public async Task<IEnumerable<DocumentType>> GetDocumentTypesAsync()
     {
-        if (_useLocalMode && _localStore != null)
+        try
         {
-            return await _localStore.GetDocumentTypesAsync();
+            return await _httpClient.GetFromJsonAsync<IEnumerable<DocumentType>>("documents/types")
+                   ?? new List<DocumentType>();
         }
-
-        return await _httpClient.GetFromJsonAsync<IEnumerable<DocumentType>>("documents/types")
-               ?? new List<DocumentType>();
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetDocumentTypesAsync();
+        }
     }
 
     public async Task<Document?> GetDocumentByIdAsync(Guid id)
     {
         Document? doc = null;
-        if (_useLocalMode && _localStore != null)
-        {
-            doc = await _localStore.GetDocumentByIdAsync(id);
-        }
-        else
+        try
         {
             doc = await _httpClient.GetFromJsonAsync<Document>($"documents/{id}");
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            doc = await store.GetDocumentByIdAsync(id);
         }
 
         if (doc != null)
@@ -165,8 +157,21 @@ public class DocumentService : IDocumentService
 
     public async Task<Document?> CreateDocumentAsync(CreateDocumentRequest request)
     {
-        if (_useLocalMode && _localStore != null)
+        try
         {
+            var response = await _httpClient.PostAsJsonAsync("documents", request);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<Document>();
+            }
+            
+            // Read error message from server for diagnostics
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Error del servidor ({(int)response.StatusCode}): {errorContent}");
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
             var doc = new Document
             {
                 Id = Guid.NewGuid(),
@@ -182,68 +187,92 @@ public class DocumentService : IDocumentService
                 UpdatedAt = DateTime.UtcNow
             };
             
-            return await _localStore.CreateDocumentAsync(doc);
+            return await store.CreateDocumentAsync(doc);
         }
-
-        var response = await _httpClient.PostAsJsonAsync("documents", request);
-        if (response.IsSuccessStatusCode)
-        {
-            return await response.Content.ReadFromJsonAsync<Document>();
-        }
-        return null;
     }
 
     public async Task<bool> UpdateStatusAsync(Guid id, DocumentStatus newStatus, string comments)
     {
-        var response = await _httpClient.PatchAsJsonAsync($"documents/{id}/status", 
-            new { status = newStatus, comments });
-        if (response.IsSuccessStatusCode)
+        try
         {
-            await LogAsync("STATUS_CHANGE", "Document", id, $"Estado cambiado a {newStatus}. Motivo: {comments}");
-            return true;
+            var response = await _httpClient.PatchAsJsonAsync($"documents/{id}/status", 
+                new { status = newStatus, comments });
+            if (response.IsSuccessStatusCode)
+            {
+                await LogAsync("STATUS_CHANGE", "Document", id, $"Estado cambiado a {newStatus}. Motivo: {comments}");
+                return true;
+            }
+            return false;
         }
-        return false;
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            var success = await store.UpdateDocumentStatusAsync(id, newStatus);
+            if (success) await LogAsync("STATUS_CHANGE", "Document", id, $"Estado cambiado localmente a {newStatus}. Motivo: {comments}");
+            return success;
+        }
     }
 
     public async Task<bool> UpdateDocumentAsync(Guid id, CreateDocumentRequest request)
     {
-        if (_useLocalMode && _localStore != null)
+        try
         {
-            var success = await _localStore.UpdateDocumentAsync(id, request);
+            var response = await _httpClient.PutAsJsonAsync($"documents/{id}", request);
+            if (response.IsSuccessStatusCode)
+            {
+                await LogAsync("EDIT", "Document", id, $"Editado via API: {request.Title}");
+                return true;
+            }
+            return false;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            var success = await store.UpdateDocumentAsync(id, request);
             if (success) await LogAsync("EDIT", "Document", id, $"Editado local: {request.Title}");
             return success;
         }
-
-        var response = await _httpClient.PutAsJsonAsync($"documents/{id}", request);
-        if (response.IsSuccessStatusCode)
-        {
-            await LogAsync("EDIT", "Document", id, $"Editado via API: {request.Title}");
-            return true;
-        }
-        return false;
     }
 
     public async Task<bool> DeleteDocumentAsync(Guid id)
     {
-        if (_useLocalMode && _localStore != null)
+        try
         {
-            var success = await _localStore.DeleteDocumentAsync(id);
+            var response = await _httpClient.DeleteAsync($"documents/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LogAsync("DELETE", "Document", id, "Borrado vía API");
+                return true;
+            }
+            return false;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            var success = await store.DeleteDocumentAsync(id);
             if (success) await LogAsync("TRASH", "Document", id, "Movido a papelera de auditoría");
             return success;
         }
-        
-        var response = await _httpClient.DeleteAsync($"documents/{id}");
-        if (response.IsSuccessStatusCode)
-        {
-            await LogAsync("DELETE", "Document", id, "Borrado vía API");
-            return true;
-        }
-        return false;
     }
 
     public async Task<bool> UploadFileAsync(Guid id, byte[] fileData, string fileName, string contentType)
     {
-        if (_useLocalMode && _localStore != null)
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(fileData);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            content.Add(fileContent, "file", fileName);
+
+            var response = await _httpClient.PostAsync($"documents/{id}/upload", content);
+            if (response.IsSuccessStatusCode)
+            {
+                await LogAsync("UPLOAD", "Document", id, $"Subido archivo: {fileName}");
+                return true;
+            }
+            return false;
+        }
+        catch
         {
             // For local mode, we reuse CreateDocumentWithFileAsync logic which handles archival
             // We need to fetch the existing document metadata first
@@ -275,26 +304,20 @@ public class DocumentService : IDocumentService
                 
             return result.Document != null;
         }
-
-        using var content = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(fileData);
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        content.Add(fileContent, "file", fileName);
-
-        var response = await _httpClient.PostAsync($"documents/{id}/upload", content);
-        if (response.IsSuccessStatusCode)
-        {
-            await LogAsync("UPLOAD", "Document", id, $"Subido archivo: {fileName}");
-            return true;
-        }
-        return false;
     }
 
     public async Task<byte[]?> GetFileContentAsync(Guid id)
     {
-        if (_useLocalMode && _localStore != null)
+        try
         {
-            var doc = await _localStore.GetDocumentByIdAsync(id);
+            var bytes = await _httpClient.GetByteArrayAsync($"documents/{id}/file");
+            await LogAsync("DOWNLOAD", "Document", id, "Archivo descargado vía API");
+            return bytes;
+        }
+        catch 
+        { 
+            var store = await GetLocalStoreAsync();
+            var doc = await store.GetDocumentByIdAsync(id);
             var version = doc?.Versions?.OrderByDescending(v => v.CreatedAt).FirstOrDefault();
             
             if (version?.LocalFilePath != null && System.IO.File.Exists(version.LocalFilePath))
@@ -304,38 +327,22 @@ public class DocumentService : IDocumentService
             }
             return null;
         }
-
-        try
-        {
-            var bytes = await _httpClient.GetByteArrayAsync($"documents/{id}/file");
-            await LogAsync("DOWNLOAD", "Document", id, "Archivo descargado vía API");
-            return bytes;
-        }
-        catch { return null; }
     }
 
     // New local mode method
     public async Task<Document?> CreateDocumentWithFileAsync(string docCode, string title, DocumentStatus status, Guid? documentTypeId, int? reviewIntervalMonths, string versionLabel, string? area, string? process, byte[] fileBytes, string fileName, string subFolderName)
     {
-        if (_useLocalMode && _localStore != null)
+        var store = await GetLocalStoreAsync();
+        var (document, version) = await store.CreateDocumentWithFileAsync(docCode, title, status, documentTypeId, reviewIntervalMonths, versionLabel, area, process, fileBytes, fileName, subFolderName);
+        if (document != null)
         {
-            var (document, version) = await _localStore.CreateDocumentWithFileAsync(docCode, title, status, documentTypeId, reviewIntervalMonths, versionLabel, area, process, fileBytes, fileName, subFolderName);
-            // Attach version to document for return
             document.Versions = new List<DocumentVersion> { version };
-            return document;
         }
-        
-        // Fallback to API mode (not implemented yet - would need separate endpoint)
-        throw new NotImplementedException("API mode file upload not yet implemented");
+        return document;
     }
 
     public async Task<Guid?> GetOrCreateFolderIdAsync(string folderName)
     {
-        if (_useLocalMode && _localStore != null)
-        {
-            return await _localStore.FindOrCreateFolderIdAsync(folderName);
-        }
-        
         try
         {
             // 1. List Root Folders
@@ -345,7 +352,6 @@ public class DocumentService : IDocumentService
             if (existing != null) return existing.Id;
 
             // 2. Create if not exists
-            // POST api/folders?name=XXX
             var response = await _httpClient.PostAsync($"folders?name={Uri.EscapeDataString(folderName)}", null);
             if (response.IsSuccessStatusCode)
             {
@@ -353,35 +359,36 @@ public class DocumentService : IDocumentService
                 return newFolder?.Id;
             }
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Error getting online folder: {ex.Message}");
+            // Fallback to local
         }
 
-        return null;
+        var store = await GetLocalStoreAsync();
+        return await store.FindOrCreateFolderIdAsync(folderName);
     }
 
     public async Task InitializeAsync()
     {
-        await CheckConnectionAsync();
-        
-        if (_localStore != null)
-        {
-            await _localStore.InitializeAsync();
-        }
+        await GetLocalStoreAsync();
     }
 
     public async Task LogAsync(string action, string entityType, Guid? entityId, string details)
     {
-        if (_localStore != null)
+        try
         {
-            await _localStore.LogAuditAsync(new AuditLog
+            await _httpClient.PostAsJsonAsync("audit/logs", new { action, entityType, entityId, details });
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            await store.LogAuditAsync(new AuditLog
             {
                 Action = action,
                 EntityType = entityType,
                 EntityId = entityId,
                 Details = details,
-                UserId = Guid.Empty, // Placeholder
+                UserId = Guid.Empty,
                 UserName = "Usuario Local"
             });
         }

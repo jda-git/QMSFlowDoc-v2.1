@@ -32,7 +32,8 @@ public record CreateNCRequest(
     bool ImpactPatient,
     string? Containment,
     string? Origin,
-    string? RootCauseAnalysis
+    string? RootCauseAnalysis,
+    Guid? DetectedByUserId = null // Added for local tracking
 );
 
 public record CreateCAPARequest(

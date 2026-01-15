@@ -47,7 +47,8 @@ public class LotSummaryDto
     public Guid Id { get; set; }
     public string LotNumber { get; set; } = string.Empty;
     public DateTime ExpiryDate { get; set; }
-    public string FormattedString => $"LOTE:{LotNumber} FECHA:{ExpiryDate:MM/yy}";
+    public decimal Qty { get; set; }
+    public string FormattedString => $"LOTE:{LotNumber} FECHA:{ExpiryDate:MM/yy} CANT:{Qty}";
 }
 
 public record CreateReagentRequest(
@@ -75,7 +76,8 @@ public record RegisterLotRequest(
     DateTime ReceivedDate,
     decimal ReceivedQty,
     Guid? LocationId,
-    Guid? PanelId // ISO 15189
+    Guid? PanelId, // ISO 15189
+    Guid? UserId // Added for local tracking
 );
 
 public record AdjustStockRequest(
@@ -84,7 +86,8 @@ public record AdjustStockRequest(
     InventoryMovementType MovementType,
     decimal Qty,
     string Reason,
-    string? Notes = null
+    string? Notes = null,
+    Guid? UserId = null // Added for local tracking
 );
 
 

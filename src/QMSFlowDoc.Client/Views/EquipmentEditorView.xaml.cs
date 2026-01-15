@@ -124,6 +124,7 @@ public sealed partial class EquipmentEditorView : Page
                     action,
                     NameBox.Text,
                     $"Etiqueta: {AssetTagBox.Text}, Fabricante: {ManufacturerBox.Text}",
+                    _authService.CurrentUserId?.ToString(),
                     userName
                 );
                 Frame.GoBack();

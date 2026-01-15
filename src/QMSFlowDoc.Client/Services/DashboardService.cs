@@ -14,10 +14,24 @@ public interface IDashboardService
 public class DashboardService : IDashboardService
 {
     private readonly HttpClient _httpClient;
+    private readonly NetworkConfigStore _networkConfig;
+    private LocalDocumentStore? _localStore;
 
-    public DashboardService(HttpClient httpClient)
+    public DashboardService(HttpClient httpClient, LocalDocumentStore? localStore = null, NetworkConfigStore? networkConfig = null)
     {
         _httpClient = httpClient;
+        _networkConfig = networkConfig ?? new NetworkConfigStore();
+        _localStore = localStore;
+    }
+
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
+        {
+            _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
+        }
+        return _localStore;
     }
 
     public async Task<DashboardDataDto?> GetDashboardDataAsync()
@@ -28,7 +42,8 @@ public class DashboardService : IDashboardService
         }
         catch
         {
-            return null;
+            var store = await GetLocalStoreAsync();
+            return await store.GetDashboardDataAsync();
         }
     }
 }

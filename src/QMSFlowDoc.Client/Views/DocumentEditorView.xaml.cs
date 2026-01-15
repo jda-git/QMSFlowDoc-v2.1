@@ -255,7 +255,10 @@ public sealed partial class DocumentEditorView : Page
         }
         catch (Exception ex)
         {
-            ErrorText.Text = $"Error: {ex.Message}";
+            var message = ex.Message;
+            if (ex.InnerException != null) message += $" -> {ex.InnerException.Message}";
+            
+            ErrorText.Text = $"Error: {message}";
             ErrorText.Visibility = Visibility.Visible;
         }
     }

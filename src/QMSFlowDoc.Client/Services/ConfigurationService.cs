@@ -20,27 +20,46 @@ public class ConfigurationService : IConfigurationService
 {
     private readonly HttpClient _httpClient;
 
-    public ConfigurationService(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
-
     public async Task<IEnumerable<ReagentType>> GetReagentTypesAsync()
     {
-        return await _httpClient.GetFromJsonAsync<IEnumerable<ReagentType>>("configuration/reagent-types")
-               ?? new List<ReagentType>();
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<IEnumerable<ReagentType>>("configuration/reagent-types")
+                   ?? new List<ReagentType>();
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetReagentTypesAsync();
+        }
     }
 
     public async Task<ReagentType?> CreateReagentTypeAsync(ReagentType type)
     {
-        var response = await _httpClient.PostAsJsonAsync("configuration/reagent-types", type);
-        return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<ReagentType>() : null;
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("configuration/reagent-types", type);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<ReagentType>() : null;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.CreateReagentTypeAsync(type);
+        }
     }
 
     public async Task<bool> DeleteReagentTypeAsync(Guid id)
     {
-        var response = await _httpClient.DeleteAsync($"configuration/reagent-types/{id}");
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"configuration/reagent-types/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.DeleteReagentTypeAsync(id);
+        }
     }
 
     public async Task<SystemSetting?> GetSettingAsync(string key)
@@ -52,7 +71,31 @@ public class ConfigurationService : IConfigurationService
 
     public async Task<bool> UpdateSettingAsync(SystemSetting setting)
     {
-        var response = await _httpClient.PutAsJsonAsync($"configuration/settings/{setting.Key}", setting);
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"configuration/settings/{setting.Key}", setting);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+    
+    // Needed for accessing local store
+    private readonly NetworkConfigStore _networkConfig;
+    private LocalDocumentStore? _localStore;
+
+    public ConfigurationService(HttpClient httpClient, NetworkConfigStore networkConfig)
+    {
+        _httpClient = httpClient;
+        _networkConfig = networkConfig;
+    }
+
+    private async Task<LocalDocumentStore> GetLocalStoreAsync()
+    {
+        if (_localStore == null)
+        {
+            _localStore = new LocalDocumentStore(_networkConfig);
+            await _localStore.InitializeAsync();
+        }
+        return _localStore;
     }
 }

@@ -209,7 +209,8 @@ public sealed partial class InventoryView : Page
                 DateTime.UtcNow,
                 (decimal)qtyBox.Value,
                 null,  // LocationId
-                null   // PanelId
+                null,  // PanelId
+                _authService.CurrentUserId
             );
 
             var lot = await _inventoryService.RegisterLotAsync(request);

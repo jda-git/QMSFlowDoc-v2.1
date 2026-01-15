@@ -117,13 +117,18 @@ public class NetworkConfigStore
         var folders = new[]
         {
             "Auditoria",
+            "Controles_Externos",  // EQA module
             "Documentos",
-            "Documentos/VERSIONES ANTIGUAS",
+            "Documentos/VERSIONES_ANTIGUAS",
             "Equipos",
             "Incidencias",
-            "Personal",
             "Inventario",
-            "Base datos",
+            "Metodos",             // Methods/Panels module
+            "Metodos/Paneles",
+            "Metodos/Control_Cambios",
+            "Metodos/Validaciones",
+            "Personal",
+            "Base_datos",          // SQLite database folder
             "_Trash/local",
             "_Trash/network"
         };
