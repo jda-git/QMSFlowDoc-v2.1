@@ -31,6 +31,9 @@ public sealed partial class StaffView : Page
     {
         try
         {
+            LoadingBar.Visibility = Visibility.Visible;
+            if (StaffList != null) StaffList.Opacity = 0.5;
+
             var list = await _staffService.GetStaffAsync();
             StaffMembers.Clear();
             foreach (var item in list)
@@ -42,7 +45,19 @@ public sealed partial class StaffView : Page
         {
             System.Diagnostics.Debug.WriteLine($"Error loading staff: {ex.Message}");
         }
+        finally
+        {
+            LoadingBar.Visibility = Visibility.Collapsed;
+            if (StaffList != null) StaffList.Opacity = 1.0;
+            
+            if (EmptyStatePane != null)
+            {
+                EmptyStatePane.Visibility = StaffMembers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
     }
+
+
 
     private void AddStaff_Click(object sender, RoutedEventArgs e)
     {
@@ -134,4 +149,19 @@ public sealed partial class StaffView : Page
             }
         }
     }
+
+
+    private async void ExportExcel_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var exportService = ((App)Application.Current).ExportService;
+            await exportService.ExportStaffToExcelAsync(StaffMembers);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Export error: {ex.Message}");
+        }
+    }
 }
+

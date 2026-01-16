@@ -57,6 +57,11 @@ public sealed partial class DocumentsView : Page
     {
         try
         {
+            if (LoadingBar != null) LoadingBar.Visibility = Visibility.Visible;
+            // Opacity for sidebar and list
+            FoldersList.Opacity = 0.5;
+            if (DocumentsList != null) DocumentsList.Opacity = 0.5;
+
             var app = (App)Application.Current;
             var includeObsolete = ShowObsoleteCheck?.IsChecked ?? false;
             var docs = await app.DocumentService.GetDocumentsAsync(includeObsolete);
@@ -69,7 +74,21 @@ public sealed partial class DocumentsView : Page
         {
             System.Diagnostics.Debug.WriteLine($"Error loading documents: {ex.Message}");
         }
+        finally
+        {
+            if (LoadingBar != null) LoadingBar.Visibility = Visibility.Collapsed;
+            FoldersList.Opacity = 1.0;
+            if (DocumentsList != null) DocumentsList.Opacity = 1.0;
+            
+            if (EmptyStatePane != null)
+            {
+                EmptyStatePane.Visibility = Documents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
     }
+
+
 
     private void ApplyFilterAndSort()
     {

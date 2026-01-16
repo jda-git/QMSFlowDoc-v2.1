@@ -38,6 +38,9 @@ public sealed partial class EquipmentView : Page
     {
         try
         {
+            LoadingBar.Visibility = Visibility.Visible;
+            if (EquipmentList != null) EquipmentList.Opacity = 0.5;
+
             var list = await _equipmentService.GetEquipmentAsync();
             Equipment.Clear();
             foreach (var item in list)
@@ -49,7 +52,19 @@ public sealed partial class EquipmentView : Page
         {
             System.Diagnostics.Debug.WriteLine($"Error loading equipment: {ex.Message}");
         }
+        finally
+        {
+            LoadingBar.Visibility = Visibility.Collapsed;
+            if (EquipmentList != null) EquipmentList.Opacity = 1.0;
+            
+            if (EmptyStatePane != null)
+            {
+                EmptyStatePane.Visibility = Equipment.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
     }
+
+
 
     private void AddEquipment_Click(object sender, RoutedEventArgs e)
     {
@@ -394,4 +409,18 @@ public sealed partial class EquipmentView : Page
         Equipment.Clear();
         foreach (var i in sorted) Equipment.Add(i);
     }
+
+    private async void ExportExcel_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var exportService = ((App)Application.Current).ExportService;
+            await exportService.ExportEquipmentToExcelAsync(Equipment);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Export error: {ex.Message}");
+        }
+    }
 }
+

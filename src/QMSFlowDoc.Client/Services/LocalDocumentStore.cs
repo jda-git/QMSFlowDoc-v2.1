@@ -433,12 +433,44 @@ public class LocalDocumentStore
                 FOREIGN KEY (ProgramId) REFERENCES EQAPrograms(Id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS Methods (
+                Id TEXT PRIMARY KEY,
+                Code TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                Category TEXT,
+                Status INTEGER NOT NULL DEFAULT 0,
+                CurrentVersion TEXT,
+                EffectiveDate TEXT,
+                DocumentId TEXT,
+                Notes TEXT,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS MethodAuthorizations (
+                Id TEXT PRIMARY KEY,
+                MethodId TEXT NOT NULL,
+                UserId TEXT NOT NULL,
+                AuthorizedAt TEXT NOT NULL,
+                ExpiresAt TEXT,
+                AuthorizedByUserId TEXT,
+                FOREIGN KEY (MethodId) REFERENCES Methods(Id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS MethodReagents (
+                Id TEXT PRIMARY KEY,
+                MethodId TEXT NOT NULL,
+                ReagentId TEXT NOT NULL,
+                FOREIGN KEY (MethodId) REFERENCES Methods(Id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_documents_code ON Documents(DocCode);
             CREATE INDEX IF NOT EXISTS idx_versions_document ON DocumentVersions(DocumentId);
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON AuditLogs(Timestamp);
             CREATE INDEX IF NOT EXISTS idx_users_username ON Users(Username);
             CREATE INDEX IF NOT EXISTS idx_staff_name ON StaffProfiles(FullName);
         ";
+
 
         using var command = new SqliteCommand(createTableSql, connection);
         await command.ExecuteNonQueryAsync();
@@ -1524,6 +1556,17 @@ public class LocalDocumentStore
         // 5. Staff
         stats.ActiveStaffCount = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM StaffProfiles WHERE Status = 'ACTIVO'", connection).ExecuteScalarAsync());
 
+        // 6. EQA
+        stats.ActiveEQAPrograms = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM EQAPrograms WHERE Status = 0", connection).ExecuteScalarAsync());
+        stats.PendingEQAResults = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM EQAResults WHERE Status IN (0, 1)", connection).ExecuteScalarAsync());
+
+        // 7. Methods
+        stats.ActiveMethods = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM Methods WHERE Status = 1", connection).ExecuteScalarAsync());
+        stats.ExpiringAuthorizations = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM MethodAuthorizations WHERE ExpiresAt IS NOT NULL AND date(ExpiresAt) <= date('now', '+30 days')", connection).ExecuteScalarAsync());
+
+        // 8. Expiring Reagents (within 60 days)
+        stats.ExpiringReagents = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(DISTINCT ReagentId) FROM ReagentLots WHERE date(ExpirationDate) <= date('now', '+60 days') AND date(ExpirationDate) > date('now')", connection).ExecuteScalarAsync());
+
         // Recent Activity (Audit Logs)
         var logs = new List<DashboardRecentActivityDto>();
         var logSql = "SELECT Action, EntityType, Details, Timestamp, UserName FROM AuditLogs ORDER BY Timestamp DESC LIMIT 10";
@@ -1541,6 +1584,7 @@ public class LocalDocumentStore
         }
 
         return new DashboardDataDto(stats, logs);
+
     }
 
     // Global Search
@@ -1943,6 +1987,48 @@ public class LocalDocumentStore
         
         await cmd.ExecuteNonQueryAsync();
     }
+
+    public async Task<List<AuditLogDto>> GetAuditLogsAsync(DateTime? fromDate = null, DateTime? toDate = null)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT * FROM AuditLogs";
+        var clauses = new List<string>();
+        
+        if (fromDate.HasValue) clauses.Add("Timestamp >= $from");
+        if (toDate.HasValue) clauses.Add("Timestamp <= $to");
+
+        if (clauses.Any())
+        {
+            sql += " WHERE " + string.Join(" AND ", clauses);
+        }
+        
+        sql += " ORDER BY Timestamp DESC LIMIT 1000"; // Safety limit
+
+        using var cmd = new SqliteCommand(sql, connection);
+        if (fromDate.HasValue) cmd.Parameters.AddWithValue("$from", fromDate.Value.ToString("o"));
+        if (toDate.HasValue) cmd.Parameters.AddWithValue("$to", toDate.Value.ToString("o"));
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<AuditLogDto>();
+
+        while (await reader.ReadAsync())
+        {
+            list.Add(new AuditLogDto
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                Action = reader["Action"].ToString()!,
+                Resource = reader["Resource"] == DBNull.Value ? "" : reader["Resource"].ToString()!,
+                Details = reader["Details"] == DBNull.Value ? "" : reader["Details"].ToString()!,
+                Timestamp = DateTime.Parse(reader["Timestamp"].ToString()!),
+                UserId = reader["UserId"] == DBNull.Value ? null : reader["UserId"].ToString(),
+                UserName = reader["UserName"] == DBNull.Value ? null : reader["UserName"].ToString()
+            });
+        }
+        return list;
+    }
+
     private async Task SeedDocumentTypesAsync(SqliteConnection connection)
     {
         var types = new List<(Guid Id, string Code, string Name)>
@@ -2844,11 +2930,24 @@ public class LocalDocumentStore
         return list;
     }
 
+    private async Task<string> GetUserNameByIdAsync(SqliteConnection connection, Guid? userId)
+    {
+        if (!userId.HasValue) return "Local Admin";
+
+        var sql = "SELECT Username FROM Users WHERE Id = $id";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", userId.Value.ToString());
+        var result = await cmd.ExecuteScalarAsync();
+        return result?.ToString() ?? "Local Admin";
+    }
+
     public async Task AssessCompetencyAsync(AssessCompetencyRequest req)
     {
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         await connection.OpenAsync();
         
+        var evaluatorName = await GetUserNameByIdAsync(connection, req.AssessedByUserId);
+
         var sql = @"INSERT INTO CompetencyEvaluations (Id, StaffId, CompetencyName, Area, EvaluationDate, ValidUntil, Outcome, Evidence, EvaluatorName)
                     VALUES ($id, $sid, $name, $area, $date, $valid, $out, $evid, $eval)";
         using var cmd = new SqliteCommand(sql, connection);
@@ -2860,7 +2959,7 @@ public class LocalDocumentStore
         cmd.Parameters.AddWithValue("$valid", req.ValidUntil?.ToString("o") ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$out", req.Outcome.ToString());
         cmd.Parameters.AddWithValue("$evid", req.Evidence ?? (object)DBNull.Value);
-        cmd.Parameters.AddWithValue("$eval", "Local Admin");
+        cmd.Parameters.AddWithValue("$eval", evaluatorName);
         await cmd.ExecuteNonQueryAsync();
     }
     
@@ -2907,6 +3006,8 @@ public class LocalDocumentStore
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         await connection.OpenAsync();
         
+        var grantedByName = await GetUserNameByIdAsync(connection, req.GrantedByUserId);
+
         var sql = @"INSERT INTO StaffAuthorizations (Id, StaffId, TaskName, Description, ValidFrom, ValidUntil, GrantedAt, Status, GrantedByName)
                     VALUES ($id, $sid, $name, $desc, $from, $until, $granted, $status, $by)";
         using var cmd = new SqliteCommand(sql, connection);
@@ -2918,7 +3019,7 @@ public class LocalDocumentStore
         cmd.Parameters.AddWithValue("$until", req.ValidUntil?.ToString("o") ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$granted", DateTime.UtcNow.ToString("o"));
         cmd.Parameters.AddWithValue("$status", "Active");
-        cmd.Parameters.AddWithValue("$by", "Local Admin");
+        cmd.Parameters.AddWithValue("$by", grantedByName);
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -3449,6 +3550,25 @@ public class LocalDocumentStore
         await cmd.ExecuteNonQueryAsync();
     }
 
+    public async Task UpdateEQAResultAsync(UpdateEQAResultRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"UPDATE EQAResults 
+                    SET Status=$status, Score=$score, Performance=$perf, Notes=$notes 
+                    WHERE Id=$id";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", request.Id.ToString());
+        cmd.Parameters.AddWithValue("$status", (int)request.Status);
+        cmd.Parameters.AddWithValue("$score", request.Score ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$perf", (int)request.Performance);
+        cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     public async Task<List<EQAResultDto>> GetEQAResultsAsync(Guid programId)
     {
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -3474,10 +3594,209 @@ public class LocalDocumentStore
                 perf.ToString(),
                 color,
                 reader["SubmissionDate"] == DBNull.Value ? null : DateTime.Parse(reader["SubmissionDate"].ToString()),
-                reader["Score"] == DBNull.Value ? null : Convert.ToDecimal(reader["Score"])
+                reader["Score"] == DBNull.Value ? null : Convert.ToDecimal(reader["Score"]),
+                reader["Notes"] == DBNull.Value ? null : reader["Notes"].ToString()
             ));
         }
         return list;
     }
+
+
+    // --- Methods Module ---
+
+    public async Task<Method> CreateMethodAsync(CreateMethodRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var id = Guid.NewGuid();
+        var now = DateTime.UtcNow.ToString("o");
+
+        var sql = @"INSERT INTO Methods (Id, Code, Name, Category, Status, CurrentVersion, DocumentId, Notes, CreatedAt, UpdatedAt)
+                    VALUES ($id, $code, $name, $cat, $status, $ver, $docId, $notes, $created, $updated)";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$code", request.Code);
+        cmd.Parameters.AddWithValue("$name", request.Name);
+        cmd.Parameters.AddWithValue("$cat", request.Category ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$status", (int)MethodStatus.DRAFT);
+        cmd.Parameters.AddWithValue("$ver", request.CurrentVersion ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$docId", request.DocumentId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$created", now);
+        cmd.Parameters.AddWithValue("$updated", now);
+
+        await cmd.ExecuteNonQueryAsync();
+
+        return new Method
+        {
+            Id = id,
+            Code = request.Code,
+            Name = request.Name,
+            Category = request.Category,
+            Status = MethodStatus.DRAFT,
+            CurrentVersion = request.CurrentVersion,
+            DocumentId = request.DocumentId,
+            Notes = request.Notes,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public async Task UpdateMethodAsync(UpdateMethodRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"UPDATE Methods 
+                    SET Code=$code, Name=$name, Category=$cat, Status=$status, CurrentVersion=$ver, 
+                        EffectiveDate=$effDate, DocumentId=$docId, Notes=$notes, UpdatedAt=$updated
+                    WHERE Id=$id";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", request.Id.ToString());
+        cmd.Parameters.AddWithValue("$code", request.Code);
+        cmd.Parameters.AddWithValue("$name", request.Name);
+        cmd.Parameters.AddWithValue("$cat", request.Category ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$status", (int)request.Status);
+        cmd.Parameters.AddWithValue("$ver", request.CurrentVersion ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$effDate", request.EffectiveDate?.ToString("o") ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$docId", request.DocumentId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("o"));
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<List<MethodDto>> GetMethodsAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var list = new List<MethodDto>();
+        var sql = "SELECT m.*, d.Title as DocTitle, (SELECT COUNT(*) FROM MethodAuthorizations WHERE MethodId = m.Id) as AuthCount FROM Methods m LEFT JOIN Documents d ON m.DocumentId = d.Id WHERE m.Status != 2 ORDER BY m.Code";
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var status = (MethodStatus)Convert.ToInt32(reader["Status"]);
+            var statusDisplay = status switch
+            {
+                MethodStatus.DRAFT => "Borrador",
+                MethodStatus.ACTIVE => "Activo",
+                MethodStatus.OBSOLETE => "Obsoleto",
+                _ => "Desconocido"
+            };
+
+            list.Add(new MethodDto
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                Code = reader["Code"].ToString()!,
+                Name = reader["Name"].ToString()!,
+                Category = reader["Category"] == DBNull.Value ? null : reader["Category"].ToString(),
+                Status = status,
+                StatusDisplay = statusDisplay,
+                CurrentVersion = reader["CurrentVersion"] == DBNull.Value ? null : reader["CurrentVersion"].ToString(),
+                EffectiveDate = reader["EffectiveDate"] == DBNull.Value ? null : DateTime.Parse(reader["EffectiveDate"].ToString()!),
+                DocumentId = reader["DocumentId"] == DBNull.Value ? null : Guid.Parse(reader["DocumentId"].ToString()!),
+                DocumentTitle = reader["DocTitle"] == DBNull.Value ? null : reader["DocTitle"].ToString(),
+                AuthorizedUsersCount = Convert.ToInt32(reader["AuthCount"])
+            });
+        }
+
+        return list;
+    }
+
+
+    public async Task<Method?> GetMethodByIdAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT * FROM Methods WHERE Id = $id";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return new Method
+            {
+                Id = Guid.Parse(reader["Id"].ToString()),
+                Code = reader["Code"].ToString(),
+                Name = reader["Name"].ToString(),
+                Category = reader["Category"] == DBNull.Value ? null : reader["Category"].ToString(),
+                Status = (MethodStatus)Convert.ToInt32(reader["Status"]),
+                CurrentVersion = reader["CurrentVersion"] == DBNull.Value ? null : reader["CurrentVersion"].ToString(),
+                EffectiveDate = reader["EffectiveDate"] == DBNull.Value ? null : DateTime.Parse(reader["EffectiveDate"].ToString()),
+                DocumentId = reader["DocumentId"] == DBNull.Value ? null : Guid.Parse(reader["DocumentId"].ToString()),
+                Notes = reader["Notes"] == DBNull.Value ? null : reader["Notes"].ToString(),
+                CreatedAt = DateTime.Parse(reader["CreatedAt"].ToString()),
+                UpdatedAt = reader["UpdatedAt"] == DBNull.Value ? null : DateTime.Parse(reader["UpdatedAt"].ToString())
+            };
+        }
+        return null;
+    }
+
+    public async Task AuthorizeUserForMethodAsync(AuthorizeMethodRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"INSERT INTO MethodAuthorizations (Id, MethodId, UserId, AuthorizedAt, ExpiresAt, AuthorizedByUserId)
+                    VALUES ($id, $methodId, $userId, $authAt, $expires, $authBy)";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        cmd.Parameters.AddWithValue("$methodId", request.MethodId.ToString());
+        cmd.Parameters.AddWithValue("$userId", request.UserId.ToString());
+        cmd.Parameters.AddWithValue("$authAt", DateTime.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("$expires", request.ExpiresAt?.ToString("o") ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$authBy", request.AuthorizedByUserId?.ToString() ?? (object)DBNull.Value);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<List<MethodAuthorizationDto>> GetMethodAuthorizationsAsync(Guid methodId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var list = new List<MethodAuthorizationDto>();
+        var sql = @"SELECT ma.*, sp.FullName as UserName, sp2.FullName as AuthByName 
+                    FROM MethodAuthorizations ma 
+                    LEFT JOIN StaffProfiles sp ON ma.UserId = sp.Id 
+                    LEFT JOIN StaffProfiles sp2 ON ma.AuthorizedByUserId = sp2.Id
+                    WHERE ma.MethodId = $mid ORDER BY ma.AuthorizedAt DESC";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$mid", methodId.ToString());
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            list.Add(new MethodAuthorizationDto
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                UserId = Guid.Parse(reader["UserId"].ToString()!),
+                UserName = reader["UserName"] == DBNull.Value ? "Desconocido" : reader["UserName"].ToString()!,
+                AuthorizedAt = DateTime.Parse(reader["AuthorizedAt"].ToString()!),
+                ExpiresAt = reader["ExpiresAt"] == DBNull.Value ? null : DateTime.Parse(reader["ExpiresAt"].ToString()!),
+                AuthorizedByName = reader["AuthByName"] == DBNull.Value ? null : reader["AuthByName"].ToString()
+            });
+        }
+        return list;
+
+    }
+
+    public async Task RemoveMethodAuthorizationAsync(Guid authorizationId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = new SqliteCommand("DELETE FROM MethodAuthorizations WHERE Id=$id", connection);
+        cmd.Parameters.AddWithValue("$id", authorizationId.ToString());
+        await cmd.ExecuteNonQueryAsync();
+    }
 }
+
 

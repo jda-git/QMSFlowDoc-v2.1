@@ -184,7 +184,8 @@ public sealed partial class StaffEditorView : Page
                     dialog.Outcome,
                     dialog.EvaluationDate,
                     dialog.ValidUntil,
-                    dialog.Evidence
+                    dialog.Evidence,
+                    ((App)Application.Current).AuthService.CurrentUserId
                 );
 
                 var app = (App)Application.Current;
@@ -228,7 +229,8 @@ public sealed partial class StaffEditorView : Page
                     dialog.TaskName,
                     dialog.Description,
                     dialog.ValidFrom,
-                    dialog.ValidUntil
+                    dialog.ValidUntil,
+                    ((App)Application.Current).AuthService.CurrentUserId
                 );
 
                 // 5.3 Competency Validation (ISO 15189)
@@ -459,7 +461,8 @@ public sealed partial class StaffEditorView : Page
                         dialog.Outcome,
                         dialog.EvaluationDate,
                         dialog.ValidUntil,
-                        dialog.Evidence
+                        dialog.Evidence,
+                        ((App)Application.Current).AuthService.CurrentUserId
                      );
                      await app.StaffService.AssessCompetencyAsync(req);
                      // Refresh
@@ -514,7 +517,8 @@ public sealed partial class StaffEditorView : Page
                         dialog.TaskName,
                         dialog.Description,
                         dialog.ValidFrom,
-                        dialog.ValidUntil
+                        dialog.ValidUntil,
+                        ((App)Application.Current).AuthService.CurrentUserId
                      );
 
                     // 5.3 Competency Validation (ISO 15189)

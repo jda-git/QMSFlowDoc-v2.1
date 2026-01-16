@@ -41,6 +41,9 @@ public sealed partial class DashboardView : Page, INotifyPropertyChanged
     {
         try
         {
+            LoadingBar.Visibility = Visibility.Visible;
+            StatsGrid.Opacity = 0.5;
+
             var data = await _dashboardService.GetDashboardDataAsync();
             if (data != null)
             {
@@ -50,13 +53,53 @@ public sealed partial class DashboardView : Page, INotifyPropertyChanged
                 {
                     RecentActivity.Add(activity);
                 }
+                
+                // Load Alerts
+                await LoadAlertsAsync(data.Stats);
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error loading dashboard: {ex.Message}");
         }
+        finally
+        {
+            LoadingBar.Visibility = Visibility.Collapsed;
+            StatsGrid.Opacity = 1.0;
+        }
     }
+
+
+    private async Task LoadAlertsAsync(DashboardStatsDto stats)
+    {
+        var alerts = new List<DashboardAlert>();
+
+        if (stats.PendingReviewDocs > 0)
+            alerts.Add(new DashboardAlert("Documentos", $"{stats.PendingReviewDocs} documentos pendientes de revisión"));
+        
+        if (stats.LowStockReagents > 0)
+            alerts.Add(new DashboardAlert("Inventario", $"{stats.LowStockReagents} reactivos con stock bajo"));
+        
+        if (stats.ExpiringReagents > 0)
+            alerts.Add(new DashboardAlert("Caducidad", $"{stats.ExpiringReagents} reactivos próximos a caducar (60 días)"));
+        
+        if (stats.DueEquipmentMaintenance > 0)
+            alerts.Add(new DashboardAlert("Equipos", $"{stats.DueEquipmentMaintenance} mantenimientos pendientes"));
+        
+        if (stats.PendingEQAResults > 0)
+            alerts.Add(new DashboardAlert("EQA", $"{stats.PendingEQAResults} resultados de EQA pendientes"));
+        
+        if (stats.ExpiringAuthorizations > 0)
+            alerts.Add(new DashboardAlert("Métodos", $"{stats.ExpiringAuthorizations} autorizaciones próximas a expirar"));
+        
+        if (stats.OpenHighRisks > 0)
+            alerts.Add(new DashboardAlert("Riesgos", $"{stats.OpenHighRisks} riesgos críticos abiertos"));
+
+        AlertsList.ItemsSource = alerts;
+        NoAlertsText.Visibility = alerts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        AlertsList.Visibility = alerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -65,3 +108,6 @@ public sealed partial class DashboardView : Page, INotifyPropertyChanged
     }
 
 }
+
+public record DashboardAlert(string Title, string Description);
+

@@ -17,7 +17,24 @@
             <Button x:Name="DeleteEquipmentButton" Content="Eliminar Equipo" Click="DeleteEquipment_Click" IsEnabled="False" Foreground="Red" />
             <Button Content="Registrar Mantenimiento" Click="RegisterMaintenance_Click" />
             <Button Content="Registrar QC Diario" Click="RegisterQC_Click" Style="{StaticResource AccentButtonStyle}" />
+            <Button Click="ExportExcel_Click">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xEDE1;" FontSize="14" />
+                        <TextBlock Text="Exportar Excel" />
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+
         </StackPanel>
+
+        <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,0,0,0" Grid.Row="1" Canvas.ZIndex="1" />
+
+        <StackPanel x:Name="EmptyStatePane" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16" Visibility="Collapsed">
+            <FontIcon Glyph="&#xE9A2;" FontSize="48" Foreground="Gray" />
+            <TextBlock Text="No hay equipos registrados" FontSize="18" Foreground="Gray" />
+        </StackPanel>
+
 
         <ListView Grid.Row="1" x:Name="EquipmentList"
                   ItemsSource="{x:Bind Equipment, Mode=OneWay}"

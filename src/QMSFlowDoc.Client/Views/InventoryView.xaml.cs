@@ -40,7 +40,10 @@ public sealed partial class InventoryView : Page
     {
         try
         {
-            if (ActiveFilter == null || LowStockFilter == null) return; // UI not ready
+            if (ActiveFilter == null || LowStockFilter == null) return;
+
+            if (LoadingBar != null) LoadingBar.Visibility = Visibility.Visible;
+            if (ReagentsList != null) ReagentsList.Opacity = 0.5;
 
             var isActive = ActiveFilter.IsOn ? (bool?)true : null;
             var isLowStock = LowStockFilter.IsOn;
@@ -52,9 +55,15 @@ public sealed partial class InventoryView : Page
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error loading reagents: {ex.Message}");
-            // Optional: Show error to user?
         }
+        finally
+        {
+            if (LoadingBar != null) LoadingBar.Visibility = Visibility.Collapsed;
+            if (ReagentsList != null) ReagentsList.Opacity = 1.0;
+        }
+
     }
+
 
     private void FilterAndSearch()
     {
@@ -98,7 +107,13 @@ public sealed partial class InventoryView : Page
 
         Reagents.Clear();
         foreach (var r in _allReagents) Reagents.Add(r);
+
+        if (EmptyStatePane != null)
+        {
+            EmptyStatePane.Visibility = Reagents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
+
 
     private string _currentSortColumn = "Name";
     private bool _sortAscending = true;
@@ -481,5 +496,18 @@ public sealed partial class InventoryView : Page
             1 => new Microsoft.UI.Xaml.Media.SolidColorBrush(Colors.Orange),
             _ => (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"] // Use theme brush
         };
+    }
+
+    private async void ExportExcel_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var exportService = ((App)Application.Current).ExportService;
+            await exportService.ExportReagentsToExcelAsync(_allReagents);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Error al exportar: {ex.Message}");
+        }
     }
 }

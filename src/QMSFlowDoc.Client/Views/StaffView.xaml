@@ -14,9 +14,26 @@
             <TextBlock Text="Personal y Formación" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
             <Button Content="Nueva Ficha de Personal" Style="{StaticResource AccentButtonStyle}" Click="AddStaff_Click" />
             <Button Content="EDITAR FICHA" Click="EditStaff_Click" />
+            <Button Click="ExportExcel_Click">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xEDE1;" FontSize="14" />
+                        <TextBlock Text="Exportar Excel" />
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+
             <Button Content="BORRAR FICHA" Click="DeleteStaff_Click" />
             <Button Content="LIMPIAR REGISTROS" Click="PurgeUsers_Click" Foreground="Red" />
         </StackPanel>
+
+        <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,0,0,0" Grid.Row="1" Canvas.ZIndex="1" />
+
+        <StackPanel x:Name="EmptyStatePane" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16" Visibility="Collapsed">
+            <FontIcon Glyph="&#xE716;" FontSize="48" Foreground="Gray" />
+            <TextBlock Text="No hay personal registrado" FontSize="18" Foreground="Gray" />
+        </StackPanel>
+
 
         <ListView Grid.Row="1" x:Name="StaffList"
                   ItemsSource="{x:Bind StaffMembers, Mode=OneWay}"

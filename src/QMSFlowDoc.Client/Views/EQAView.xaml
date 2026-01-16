@@ -112,7 +112,14 @@
                             <TextBlock Text="Registrar Resultado" />
                         </StackPanel>
                     </Button>
+                    <Button Click="ExportPdf_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xEA90;" FontSize="16" />
+                            <TextBlock Text="Exportar PDF" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
+
 
                 <!-- Header for List -->
                 <Grid Grid.Row="1" Padding="12,8" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
@@ -120,14 +127,16 @@
                         <ColumnDefinition Width="120" />
                         <ColumnDefinition Width="120" />
                         <ColumnDefinition Width="150" />
-                        <ColumnDefinition Width="100" />
-                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Ciclo" Grid.Column="0" FontWeight="Bold"/>
                     <TextBlock Text="Estado" Grid.Column="1" FontWeight="Bold"/>
                     <TextBlock Text="Desempeño" Grid.Column="2" FontWeight="Bold"/>
                     <TextBlock Text="Puntos" Grid.Column="3" FontWeight="Bold"/>
                     <TextBlock Text="Enviado" Grid.Column="4" FontWeight="Bold"/>
+                    <TextBlock Text="Notas" Grid.Column="5" FontWeight="Bold"/>
                 </Grid>
 
                 <ListView x:Name="ResultsList" Grid.Row="2" SelectionMode="Single">
@@ -138,19 +147,26 @@
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="dto:EQAResultDto">
-                            <Grid Padding="12,8">
+                            <Grid Padding="12,8" Background="Transparent">
+                                <Grid.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem Text="Evaluar Desempeño" Click="EvaluateResult_Click" Icon="Edit" Tag="{x:Bind}"/>
+                                    </MenuFlyout>
+                                </Grid.ContextFlyout>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120" />
                                     <ColumnDefinition Width="120" />
                                     <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="100" />
-                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="{x:Bind CycleIdentifier}" Grid.Column="0" />
                                 <TextBlock Text="{x:Bind Status}" Grid.Column="1" />
                                 <TextBlock Text="{x:Bind Performance}" Grid.Column="2" Foreground="{x:Bind PerformanceColor}" FontWeight="SemiBold" />
                                 <TextBlock Text="{x:Bind Score.ToString()}" Grid.Column="3" />
                                 <TextBlock Text="{x:Bind local:EQAView.FormatDate(SubmissionDate)}" Grid.Column="4" />
+                                <TextBlock Text="{x:Bind Notes}" Grid.Column="5" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Notes}" />
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

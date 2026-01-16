@@ -47,8 +47,14 @@ public partial class App : Application
     public Services.LocalDocumentStore LocalStore { get; }
 
     public Services.IEQAService EQAService { get; }
+    public Services.IMethodService MethodService { get; }
+    public Services.IExportService ExportService { get; }
+
+    public static Microsoft.UI.Xaml.Window? MainWindowInstance { get; set; }
 
     private System.Threading.Timer? _syncTimer;
+
+
 
     public App()
     {
@@ -75,7 +81,11 @@ public partial class App : Application
         CompetencyService = new Services.CompetencyService(httpClient, NetworkConfigStore);
         AuthorizationService = new Services.AuthorizationService(httpClient, NetworkConfigStore);
         EQAService = new Services.EQAService(LocalStore);
+        MethodService = new Services.MethodService(LocalStore);
+        ExportService = new Services.ExportService();
         EquipmentAuditLogger = new Services.AuditLogger(ConfigurationService, NetworkConfigStore); 
+
+
         
         // Init Sync Infrastructure
         SnapshotStore = new Services.Sync.SnapshotStore();
@@ -139,6 +149,7 @@ public partial class App : Application
             _syncTimer = new System.Threading.Timer(async _ => await DriveSyncEngine.RunSyncAsync(), null, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(5));
 
             Window = new MainWindow();
+            MainWindowInstance = Window;
             
             if (!AuthService.IsAuthenticated)
             {

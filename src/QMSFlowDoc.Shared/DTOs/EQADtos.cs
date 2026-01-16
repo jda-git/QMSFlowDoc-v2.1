@@ -57,5 +57,6 @@ public record EQAResultDto(
     string Performance,
     string PerformanceColor,
     DateTime? SubmissionDate,
-    decimal? Score
+    decimal? Score,
+    string? Notes
 );

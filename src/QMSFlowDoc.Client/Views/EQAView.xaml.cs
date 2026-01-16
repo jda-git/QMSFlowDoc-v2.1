@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Input;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -221,8 +222,9 @@ public sealed partial class EQAView : Page
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
         {
+             var programId = _selectedProgram.Id;
              var req = new RegisterEQAResultRequest(
-                 _selectedProgram.Id,
+                 programId,
                  cycleBox.Text,
                  null, null,
                  datePicker.Date.DateTime,
@@ -230,9 +232,109 @@ public sealed partial class EQAView : Page
              );
              await _eqaService.RegisterResultAsync(req);
              await LoadProgramsAsync(); // Refresh stats
-             await LoadResultsAsync(_selectedProgram.Id);
+             await LoadResultsAsync(programId);
         }
     }
+
+    private async void ExportPdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedProgram == null) return;
+        try
+        {
+            var results = await _eqaService.GetResultsAsync(_selectedProgram.Id);
+            var exportService = ((App)Application.Current).ExportService;
+            await exportService.ExportEqaReportToPdfAsync(results, _selectedProgram.Name);
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorAsync("Error exportando PDF", ex.Message);
+        }
+    }
+
+    private async void EvaluateResult_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item)
+        {
+            var result = item.Tag as EQAResultDto ?? item.DataContext as EQAResultDto;
+            if (result != null)
+            {
+            var dialog = new ContentDialog
+            {
+                Title = "Evaluar Desempeño",
+                PrimaryButtonText = "Guardar",
+                CloseButtonText = "Cancelar",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            var stack = new StackPanel { Spacing = 12 };
+            
+            // Performance ComboBox
+            var perfBox = new ComboBox 
+            { 
+                Header = "Desempeño", 
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                ItemsSource = Enum.GetValues(typeof(EQAPerformance)).Cast<EQAPerformance>().ToList()
+            };
+            
+            // Try parse existing performance string or default
+            if (Enum.TryParse<EQAPerformance>(result.Performance, true, out var currentPerf))
+                perfBox.SelectedItem = currentPerf;
+            else
+                perfBox.SelectedItem = EQAPerformance.NOT_EVALUATED;
+
+            // Score Box
+            var scoreBox = new TextBox 
+            { 
+                Header = "Puntuación", 
+                PlaceholderText = "0-100",
+                InputScope = new InputScope { Names = { new InputScopeName(InputScopeNameValue.Number) } },
+                Text = result.Score?.ToString() ?? "" 
+            };
+
+            // Notes Box
+            var notesBox = new TextBox 
+            { 
+                Header = "Notas", 
+                AcceptsReturn = true, 
+                Height = 80 
+            };
+
+            stack.Children.Add(perfBox);
+            stack.Children.Add(scoreBox);
+            stack.Children.Add(notesBox);
+
+            dialog.Content = stack;
+
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                decimal? score = null;
+                if (decimal.TryParse(scoreBox.Text, out var s)) score = s;
+
+                var req = new UpdateEQAResultRequest(
+                    result.Id,
+                    EQAResultStatus.EVALUATED,
+                    score,
+                    (EQAPerformance)(perfBox.SelectedItem ?? EQAPerformance.NOT_EVALUATED),
+                    notesBox.Text,
+                    null, null
+                );
+
+                await _eqaService.UpdateResultAsync(req);
+                
+                var programId = _selectedProgram?.Id ?? result.ProgramId;
+                await LoadProgramsAsync(); // Refresh stats on left pane
+                
+                // If the selected program is still the same (it should be), refresh list
+                if (_selectedProgram != null && _selectedProgram.Id == programId)
+                {
+                     await LoadResultsAsync(programId);
+                }
+            }
+        }
+    }
+}
+
 
     private async Task ShowErrorAsync(string title, string message)
     {

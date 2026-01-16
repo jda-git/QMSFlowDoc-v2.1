@@ -30,15 +30,19 @@
             <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
                 <TextBox x:Name="TitleBox" Header="Título" PlaceholderText="Resumen de la incidencia" />
                 
-                <Grid ColumnDefinitions="*, *" ColumnSpacing="16">
-                    <ComboBox x:Name="SeverityCombo" Header="Severidad" HorizontalAlignment="Stretch" SelectedIndex="0">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="SeverityCombo" Header="Severidad" HorizontalAlignment="Stretch" SelectedIndex="0" Grid.Column="0">
                         <ComboBoxItem Content="Leve" Tag="1" />
                         <ComboBoxItem Content="Moderada" Tag="2" />
                         <ComboBoxItem Content="Grave" Tag="3" />
                         <ComboBoxItem Content="Crítica" Tag="4" />
                     </ComboBox>
                     
-                    <ComboBox x:Name="StatusCombo" Header="Estado" HorizontalAlignment="Stretch" SelectedIndex="0">
+                    <ComboBox x:Name="StatusCombo" Header="Estado" HorizontalAlignment="Stretch" SelectedIndex="0" Grid.Column="1">
                         <ComboBoxItem Content="OPEN" />
                         <ComboBoxItem Content="INVESTIGATING" />
                         <ComboBoxItem Content="ACTION_REQUIRED" />

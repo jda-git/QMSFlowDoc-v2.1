@@ -276,7 +276,11 @@ public sealed partial class MainWindow : Window
             case "eqa":
                 ContentFrame.Navigate(typeof(Views.EQAView));
                 break;
+            case "methods":
+                ContentFrame.Navigate(typeof(Views.MethodsView));
+                break;
             case "improvement":
+
                 ContentFrame.Navigate(typeof(Views.ImprovementView));
                 break;
             case "issues":

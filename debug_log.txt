@@ -1,0 +1,3 @@
+[15/01/2026 23:35:59] AdjustStockAsync: Type=OUT, Qty=1, LotId=00000000-0000-0000-0000-000000000000
+[15/01/2026 23:35:59] Delta Calculated: -1
+[15/01/2026 23:35:59] Rows Updated: 0

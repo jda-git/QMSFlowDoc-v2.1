@@ -12,45 +12,90 @@
     <ScrollViewer Padding="24">
         <StackPanel Spacing="32">
             <TextBlock Text="Resumen General del Laboratorio" Style="{StaticResource TitleTextBlockStyle}" />
+            <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Visibility="Collapsed" HorizontalAlignment="Stretch" Margin="0,0,0,16" />
+
 
             <!-- KPI Cards Grid -->
             <GridView x:Name="StatsGrid" SelectionMode="None" HorizontalAlignment="Stretch">
                 <GridView.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4" />
+                        <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="5" />
                     </ItemsPanelTemplate>
                 </GridView.ItemsPanel>
                 
                 <GridView.Items>
-                    <Border Width="220" Height="120" CornerRadius="8" Background="{ThemeResource SystemControlBackgroundAccentBrush}" Padding="16" Margin="0,0,16,16">
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#0078D4" Padding="16" Margin="0,0,12,12">
                         <StackPanel>
-                            <TextBlock Text="Documentos Totales" Foreground="White" Opacity="0.8" />
-                            <TextBlock Text="{x:Bind Stats.TotalDocuments, Mode=OneWay}" FontSize="32" FontWeight="Bold" Foreground="White" />
+                            <TextBlock Text="Documentos" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.TotalDocuments, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
                         </StackPanel>
                     </Border>
 
-                    <Border Width="220" Height="120" CornerRadius="8" Background="{ThemeResource SystemControlBackgroundBaseLowBrush}" Padding="16" Margin="0,0,16,16">
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#E81123" Padding="16" Margin="0,0,12,12">
                         <StackPanel>
-                            <TextBlock Text="Pendientes Revisión" Opacity="0.8" />
-                            <TextBlock Text="{x:Bind Stats.PendingReviewDocs, Mode=OneWay}" FontSize="32" FontWeight="Bold" Foreground="#E81123" />
+                            <TextBlock Text="Revisión Pendiente" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.PendingReviewDocs, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
                         </StackPanel>
                     </Border>
 
-                    <Border Width="220" Height="120" CornerRadius="8" Background="{ThemeResource SystemControlBackgroundBaseLowBrush}" Padding="16" Margin="0,0,16,16">
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#CA5010" Padding="16" Margin="0,0,12,12">
                         <StackPanel>
-                            <TextBlock Text="Reactivos Stock Bajo" Opacity="0.8" />
-                            <TextBlock Text="{x:Bind Stats.LowStockReagents, Mode=OneWay}" FontSize="32" FontWeight="Bold" Foreground="#CA5010" />
+                            <TextBlock Text="Stock Bajo" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.LowStockReagents, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
                         </StackPanel>
                     </Border>
 
-                    <Border Width="220" Height="120" CornerRadius="8" Background="{ThemeResource SystemControlBackgroundBaseLowBrush}" Padding="16" Margin="0,0,16,16">
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#D83B01" Padding="16" Margin="0,0,12,12">
                         <StackPanel>
-                            <TextBlock Text="Riesgos Críticos" Opacity="0.8" />
-                            <TextBlock Text="{x:Bind Stats.OpenHighRisks, Mode=OneWay}" FontSize="32" FontWeight="Bold" Foreground="#E81123" />
+                            <TextBlock Text="Reactivos por Caducar" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.ExpiringReagents, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#107C10" Padding="16" Margin="0,0,12,12">
+                        <StackPanel>
+                            <TextBlock Text="Mantenimiento Equipo" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.DueEquipmentMaintenance, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#5C2D91" Padding="16" Margin="0,0,12,12">
+                        <StackPanel>
+                            <TextBlock Text="Programas EQA" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.ActiveEQAPrograms, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#8764B8" Padding="16" Margin="0,0,12,12">
+                        <StackPanel>
+                            <TextBlock Text="EQA Pendientes" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.PendingEQAResults, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#00B294" Padding="16" Margin="0,0,12,12">
+                        <StackPanel>
+                            <TextBlock Text="Métodos Activos" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.ActiveMethods, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#E81123" Padding="16" Margin="0,0,12,12">
+                        <StackPanel>
+                            <TextBlock Text="Riesgos Críticos" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.OpenHighRisks, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="200" Height="100" CornerRadius="8" Background="#0063B1" Padding="16" Margin="0,0,12,12">
+                        <StackPanel>
+                            <TextBlock Text="Personal Activo" Foreground="White" Opacity="0.8" FontSize="12" />
+                            <TextBlock Text="{x:Bind Stats.ActiveStaffCount, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="White" />
                         </StackPanel>
                     </Border>
                 </GridView.Items>
             </GridView>
+
 
             <!-- Activity and Tasks -->
             <Grid ColumnDefinitions="*, 400" ColumnSpacing="32">
@@ -78,11 +123,22 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Spacing="16">
-                    <TextBlock Text="Próximos Mantenimientos" Style="{StaticResource SubtitleTextBlockStyle}" />
-                    <Border Background="{ThemeResource SystemControlBackgroundBaseLowBrush}" CornerRadius="8" Padding="16">
-                        <TextBlock Text="No hay mantenimientos programados para hoy." FontStyle="Italic" Opacity="0.7" />
-                    </Border>
+                    <TextBlock Text="⚠️ Alertas Urgentes" Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <ListView x:Name="AlertsList" SelectionMode="None" MaxHeight="300">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,4">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="NoAlertsText" Text="✅ No hay alertas urgentes" Foreground="Green" FontStyle="Italic" Visibility="Collapsed" />
                 </StackPanel>
+
             </Grid>
         </StackPanel>
     </ScrollViewer>

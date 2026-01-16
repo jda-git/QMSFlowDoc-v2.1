@@ -75,7 +75,8 @@ public record AssessCompetencyRequest(
     CompetencyOutcome Outcome,
     DateTime EvaluationDate,
     DateTime? ValidUntil,
-    string? Evidence
+    string? Evidence,
+    Guid? AssessedByUserId = null
 );
 
 // Emisión de autorización - ahora con texto libre
@@ -84,5 +85,6 @@ public record GrantAuthorizationRequest(
     string TaskName,
     string? Description,
     DateTime ValidFrom,
-    DateTime? ValidUntil
+    DateTime? ValidUntil,
+    Guid? GrantedByUserId = null
 );

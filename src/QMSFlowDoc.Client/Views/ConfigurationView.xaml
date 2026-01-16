@@ -91,7 +91,9 @@
                         
                         <Button Content="Forzar Sincronización Completa" Click="ForceSync_Click" />
                         <Button Content="Ver Log de Sincronización" Click="ViewSyncLog_Click" />
+                        <Button Content="Exportar Logs de Auditoría (PDF)" Click="ExportAuditLog_Click" />
                     </StackPanel>
+
                 </Expander>
             </StackPanel>
             

@@ -18,10 +18,12 @@
                 <AppBarSeparator />
                 <AppBarButton Icon="Add" Label="Entrada (Lote)" Click="RegisterLot_Click" />
                 <AppBarButton Icon="Remove" Label="Salida/Consumo" Click="RegisterExit_Click" />
+                <AppBarButton Icon="Download" Label="Exportar Excel" Click="ExportExcel_Click" />
                 <AppBarButton Icon="Print" Label="Imprimir" Click="Print_Click" />
                 <AppBarSeparator />
                 <AppBarButton Icon="Delete" Label="BORRAR REGISTRO" Click="DeleteReagent_Click" Foreground="Red" />
             </CommandBar>
+
             
             <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                 <ToggleSwitch x:Name="ActiveFilter" Header="Solo Activos" IsOn="True" Toggled="Filter_Toggled" OffContent="No" OnContent="Sí" />
@@ -29,6 +31,13 @@
             </StackPanel>
 
             <AutoSuggestBox PlaceholderText="Buscar..." QueryIcon="Find" Width="200" VerticalAlignment="Center" TextChanged="SearchBox_TextChanged" />
+        </StackPanel>
+        
+        <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,0,0,0" Grid.Row="1" Canvas.ZIndex="1" />
+        
+        <StackPanel x:Name="EmptyStatePane" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16" Visibility="Collapsed">
+            <FontIcon Glyph="&#xE7BC;" FontSize="48" Foreground="Gray" />
+            <TextBlock Text="No se encontraron reactivos con los filtros actuales" FontSize="18" Foreground="Gray" />
         </StackPanel>
 
         <ListView Grid.Row="1" x:Name="ReagentsList"

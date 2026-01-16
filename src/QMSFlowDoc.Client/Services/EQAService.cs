@@ -13,6 +13,7 @@ public interface IEQAService
     Task UpdateProgramAsync(UpdateEQAProgramRequest request);
     Task<List<EQAResultDto>> GetResultsAsync(Guid programId);
     Task RegisterResultAsync(RegisterEQAResultRequest request);
+    Task UpdateResultAsync(UpdateEQAResultRequest request);
 }
 
 public class EQAService : IEQAService
@@ -47,5 +48,10 @@ public class EQAService : IEQAService
     public async Task RegisterResultAsync(RegisterEQAResultRequest request)
     {
         await _localStore.RegisterEQAResultAsync(request);
+    }
+
+    public async Task UpdateResultAsync(UpdateEQAResultRequest request)
+    {
+        await _localStore.UpdateEQAResultAsync(request);
     }
 }

@@ -222,4 +222,28 @@ public sealed partial class ConfigurationView : Page
             StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red);
         }
     }
+
+    private async void ExportAuditLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            StatusText.Text = "⏳ Generando reporte...";
+            StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Blue);
+
+            // Fetch last 1000 logs
+            var app = (App)Application.Current;
+            var logs = await app.LocalStore.GetAuditLogsAsync();
+
+            var exportService = app.ExportService;
+            await exportService.ExportAuditLogToPdfAsync(logs);
+
+            StatusText.Text = "✅ Reporte de auditoría exportado.";
+            StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"❌ Error al exportar: {ex.Message}";
+            StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red);
+        }
+    }
 }
