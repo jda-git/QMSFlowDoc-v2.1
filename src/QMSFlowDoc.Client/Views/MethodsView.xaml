@@ -6,8 +6,14 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="using:QMSFlowDoc.Client.Views"
     xmlns:dto="using:QMSFlowDoc.Shared.DTOs"
+    xmlns:converters="using:QMSFlowDoc.Client.Converters"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Page.Resources>
+        <converters:StatusToVisibilityConverter x:Key="StatusToVisibilityConverter"/>
+        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+    </Page.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -66,95 +72,197 @@
 
         <!-- Right Pane: Details -->
         <Grid Grid.Column="1" x:Name="DetailPane" Visibility="Collapsed">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+            <Pivot>
+                <PivotItem Header="Información General">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <Grid Grid.Row="0" Padding="24" Background="{ThemeResource LayerFillColorDefaultBrush}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Spacing="4">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock x:Name="DetailCode" Style="{StaticResource TitleTextBlockStyle}" />
-                        <TextBlock x:Name="DetailVersion" Style="{StaticResource SubtitleTextBlockStyle}" Foreground="Gray" VerticalAlignment="Center" />
-                    </StackPanel>
-                    <TextBlock x:Name="DetailName" Style="{StaticResource BodyTextBlockStyle}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock x:Name="DetailCategory" Foreground="Gray" />
-                        <TextBlock Text="•" Foreground="Gray" />
-                        <HyperlinkButton x:Name="DetailDocLink" Click="DetailDocLink_Click" Visibility="Collapsed">
-                            <TextBlock x:Name="DetailDocTitle" />
-                        </HyperlinkButton>
-                        <TextBlock x:Name="NoDocText" Text="Sin documento vinculado" Foreground="Gray" Visibility="Collapsed" />
-                    </StackPanel>
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <Button Click="EditMethod_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE70F;" FontSize="16" />
-                            <TextBlock Text="Editar" />
-                        </StackPanel>
-                    </Button>
-                    <Button Click="ActivateMethod_Click" x:Name="ActivateButton">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE73E;" FontSize="16" />
-                            <TextBlock Text="Activar" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Grid>
-
-            <!-- Authorizations -->
-            <Grid Grid.Row="1" Padding="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
-                    <TextBlock Text="Personal Autorizado" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
-                    <Button Style="{StaticResource AccentButtonStyle}" Click="AddAuthorization_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE8FA;" FontSize="16" />
-                            <TextBlock Text="Autorizar Usuario" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-
-                <ListView x:Name="AuthorizationsList" Grid.Row="1" SelectionMode="Single">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="dto:MethodAuthorizationDto">
-                            <Grid Padding="12,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{x:Bind UserName}" Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <TextBlock Text="{x:Bind AuthorizedAtDisplay}" Grid.Column="1" VerticalAlignment="Center" />
-                                <TextBlock Text="{x:Bind ExpiresAtDisplay}" Grid.Column="2" VerticalAlignment="Center" />
-                                <Button Grid.Column="3" Click="RemoveAuthorization_Click" Tag="{x:Bind Id}" ToolTipService.ToolTip="Revocar">
-                                    <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="Red" />
+                        <!-- Header -->
+                        <Grid Grid.Row="0" Padding="24" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock x:Name="DetailCode" Style="{StaticResource TitleTextBlockStyle}" />
+                                    <TextBlock x:Name="DetailVersion" Style="{StaticResource SubtitleTextBlockStyle}" Foreground="Gray" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock x:Name="DetailName" Style="{StaticResource BodyTextBlockStyle}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock x:Name="DetailCategory" Foreground="Gray" />
+                                    <TextBlock Text="•" Foreground="Gray" />
+                                    <HyperlinkButton x:Name="DetailDocLink" Click="DetailDocLink_Click" Visibility="Collapsed">
+                                        <TextBlock x:Name="DetailDocTitle" />
+                                    </HyperlinkButton>
+                                    <TextBlock x:Name="NoDocText" Text="Sin documento vinculado" Foreground="Gray" Visibility="Collapsed" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Button Click="EditMethod_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE70F;" FontSize="16" />
+                                        <TextBlock Text="Editar" />
+                                    </StackPanel>
                                 </Button>
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
+                                <Button Click="ActivateMethod_Click" x:Name="ActivateButton">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE73E;" FontSize="16" />
+                                        <TextBlock Text="Activar" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
 
-                </ListView>
-                
-                <TextBlock x:Name="EmptyAuthText" Grid.Row="1" Text="No hay usuarios autorizados." 
-                           HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Visibility="Collapsed" />
-            </Grid>
+                        <!-- Authorizations -->
+                        <Grid Grid.Row="1" Padding="24">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                                <TextBlock Text="Personal Autorizado" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource AccentButtonStyle}" Click="AddAuthorization_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8FA;" FontSize="16" />
+                                        <TextBlock Text="Autorizar Usuario" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <ListView x:Name="AuthorizationsList" Grid.Row="1" SelectionMode="Single">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="dto:MethodAuthorizationDto">
+                                        <Grid Padding="12,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{x:Bind UserName}" Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Text="{x:Bind AuthorizedAtDisplay}" Grid.Column="1" VerticalAlignment="Center" />
+                                            <TextBlock Text="{x:Bind ExpiresAtDisplay}" Grid.Column="2" VerticalAlignment="Center" />
+                                            <Button Grid.Column="3" Click="RemoveAuthorization_Click" Tag="{x:Bind Id}" ToolTipService.ToolTip="Revocar">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="Red" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            
+                            <TextBlock x:Name="EmptyAuthText" Grid.Row="1" Text="No hay usuarios autorizados." 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Visibility="Collapsed" />
+                        </Grid>
+                    </Grid>
+                </PivotItem>
+
+                <PivotItem Header="Historial de Versiones">
+                    <Grid Padding="24">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                            <TextBlock Text="Versiones del Método" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                            <Button Click="NewVersion_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE710;" FontSize="16" />
+                                    <TextBlock Text="Nueva Versión" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <ListView x:Name="VersionsList" Grid.Row="1" SelectionMode="Single">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                             <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="dto:MethodVersionDto">
+                                    <Grid Padding="12,8" BorderBrush="LightGray" BorderThickness="0,0,0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Version}" FontWeight="Bold" Grid.Column="0"/>
+                                        <TextBlock Text="{x:Bind Status}" Grid.Column="1" Foreground="Gray"/>
+                                        <TextBlock Text="{x:Bind ChangeDescription}" Grid.Column="2" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{x:Bind CreatedAt}" Grid.Column="3" Foreground="Gray"/>
+                                        
+                                        <Button Grid.Column="4" Content="Aprobar" Click="ApproveVersion_Click" Tag="{x:Bind Id}" 
+                                                Visibility="{Binding Status, Converter={StaticResource StatusToVisibilityConverter}}" 
+                                                IsEnabled="True" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                         <TextBlock x:Name="EmptyVersionsText" Grid.Row="1" Text="No hay historial de versiones." 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Visibility="Collapsed" />
+                    </Grid>
+                </PivotItem>
+
+                <PivotItem Header="Validación (ISO 15189)">
+                     <Grid Padding="24">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                            <TextBlock Text="Dossier de Validación (Versión Actual)" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                            <Button Click="AddValidation_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE9D2;" FontSize="16" />
+                                    <TextBlock Text="Registrar Experimento" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <ListView x:Name="ValidationsList" Grid.Row="1" SelectionMode="Single">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="dto:MethodValidationDto">
+                                    <Grid Padding="12,8" Background="#F9F9F9" Margin="0,4" CornerRadius="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="100" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{x:Bind Parameter}" FontWeight="Bold" />
+                                            <TextBlock Text="{x:Bind ExperimentCount}" Foreground="Gray" FontSize="12" />
+                                        </StackPanel>
+                                        <TextBlock Text="{x:Bind Result}" Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                        <HyperlinkButton Content="Ver Informe" Click="ViewReport_Click" Tag="{x:Bind ReportPath}" Grid.Column="2" 
+                                                         Visibility="{x:Bind ReportPath, Converter={StaticResource NullToVisibilityConverter}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <TextBlock x:Name="EmptyValidationsText" Grid.Row="1" Text="No hay registros de validación para esta versión." 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Visibility="Collapsed" />
+                     </Grid>
+                </PivotItem>
+            </Pivot>
         </Grid>
 
         <StackPanel Grid.Column="1" x:Name="EmptySelectionPane" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">

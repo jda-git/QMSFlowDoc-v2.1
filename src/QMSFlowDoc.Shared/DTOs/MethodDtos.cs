@@ -3,22 +3,6 @@ using QMSFlowDoc.Shared.Models;
 
 namespace QMSFlowDoc.Shared.DTOs;
 
-public class MethodDto
-{
-    public Guid Id { get; set; }
-    public string Code { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string? Category { get; set; }
-    public MethodStatus Status { get; set; }
-    public string StatusDisplay { get; set; } = string.Empty;
-    public string? CurrentVersion { get; set; }
-    public DateTime? EffectiveDate { get; set; }
-    public Guid? DocumentId { get; set; }
-    public string? DocumentTitle { get; set; }
-    public int AuthorizedUsersCount { get; set; }
-    
-    public string AuthorizedUsersCountDisplay => AuthorizedUsersCount == 0 ? "Sin autorizados" : $"{AuthorizedUsersCount} autorizados";
-}
 
 public record CreateMethodRequest(
     string Code,
@@ -60,3 +44,54 @@ public class MethodAuthorizationDto
     public string AuthorizedAtDisplay => AuthorizedAt.ToString("d");
     public string ExpiresAtDisplay => ExpiresAt.HasValue ? $"Expira: {ExpiresAt.Value:d}" : "Sin Expiración";
 }
+
+public record MethodVersionDto(
+    Guid Id,
+    Guid MethodId,
+    string Version,
+    string Status, // DRAFT, APPROVED, OBSOLETE
+    string? ChangeDescription,
+    string? DocumentPath,
+    string CreatedBy,
+    DateTime CreatedAt,
+    string? ApprovedBy,
+    DateTime? ApprovedAt
+);
+
+public record MethodValidationDto(
+    Guid Id,
+    Guid MethodVersionId,
+    string Parameter, // Precision, Accuracy, Limit of Detection...
+    string Result, // Pass/Fail or generic text
+    int ExperimentCount,
+    string? ReportPath,
+    string? Notes
+);
+
+public class MethodDto
+{
+    public Guid Id { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Category { get; set; }
+    public MethodStatus Status { get; set; }
+    public string StatusDisplay { get; set; } = string.Empty;
+    
+    // Legacy fields mapped from current version
+    public string? CurrentVersion { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+    public Guid? DocumentId { get; set; }
+    
+    public string? DocumentTitle { get; set; }
+    public int AuthorizedUsersCount { get; set; }
+    
+    public string AuthorizedUsersCountDisplay => AuthorizedUsersCount == 0 ? "Sin autorizados" : $"{AuthorizedUsersCount} autorizados";
+}
+
+public record CreateMethodVersionRequest(
+    Guid MethodId,
+    string Version,
+    string ChangeDescription,
+    string? DocumentPath,
+    string CreatedBy
+);

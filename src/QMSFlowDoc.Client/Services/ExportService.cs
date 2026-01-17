@@ -169,7 +169,7 @@ public class ExportService : IExportService
                     {
                         table.Cell().Element(CellStyle).Text(log.FormattedTimestamp);
                         table.Cell().Element(CellStyle).Text(log.Action);
-                        table.Cell().Element(CellStyle).Text(log.Resource);
+                        table.Cell().Element(CellStyle).Text(log.EntityType);
                         table.Cell().Element(CellStyle).Text(log.Details);
                         table.Cell().Element(CellStyle).Text(log.UserName ?? "-");
 

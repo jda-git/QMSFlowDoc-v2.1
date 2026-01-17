@@ -41,14 +41,16 @@ public class DocumentService : IDocumentService
     private readonly HttpClient _httpClient;
     private readonly ILocalCacheService _cacheService;
     private readonly NetworkConfigStore _networkConfig;
+    private readonly IAuthService? _authService;
     private LocalDocumentStore? _localStore;
 
-    public DocumentService(HttpClient httpClient, ILocalCacheService cacheService, LocalDocumentStore? localStore = null, NetworkConfigStore? networkConfig = null)
+    public DocumentService(HttpClient httpClient, ILocalCacheService cacheService, LocalDocumentStore? localStore = null, NetworkConfigStore? networkConfig = null, IAuthService? authService = null)
     {
         _httpClient = httpClient;
         _cacheService = cacheService;
         _networkConfig = networkConfig ?? new NetworkConfigStore();
         _localStore = localStore;
+        _authService = authService;
     }
 
     private async Task<LocalDocumentStore> GetLocalStoreAsync()
@@ -389,8 +391,8 @@ public class DocumentService : IDocumentService
                 EntityType = entityType,
                 EntityId = entityId,
                 Details = details,
-                UserId = Guid.Empty,
-                UserName = "Usuario Local"
+                UserId = _authService?.CurrentUserId ?? Guid.Empty,
+                UserName = _authService?.CurrentUsername ?? "Usuario Local"
             });
         }
     }

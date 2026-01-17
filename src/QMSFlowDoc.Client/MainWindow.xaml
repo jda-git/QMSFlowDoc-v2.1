@@ -28,7 +28,8 @@
                 <NavigationViewItem Content="Personal" Icon="Contact" Tag="personal" />
                 <NavigationViewItem Content="Control de Calidad (EQA)" Icon="World" Tag="eqa" />
                 <NavigationViewItem Content="Métodos" Icon="Library" Tag="methods" />
-                <NavigationViewItem Content="Mejora y Auditoría" Icon="Highlight" Tag="improvement" />
+                <NavigationViewItem Content="Mejoras" Icon="Highlight" Tag="improvement" />
+                <NavigationViewItem Content="Auditoría" Icon="List" Tag="audit" />
 
                 <NavigationViewItem Content="Incidencias" Icon="ReportHacked" Tag="issues" />
             </NavigationView.MenuItems>

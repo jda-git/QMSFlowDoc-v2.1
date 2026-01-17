@@ -88,6 +88,7 @@ public sealed partial class EquipmentView : Page
         MaintNotesBox.Text = "";
         MaintDatePicker.Date = DateTimeOffset.Now;
         MaintHasIssuesCheck.IsChecked = false;
+        MaintOutcomeCombo.SelectedIndex = 0; // Default to Pass
 
         // Populate year combo for next maintenance
         NextMaintYearCombo.Items.Clear();
@@ -107,70 +108,33 @@ public sealed partial class EquipmentView : Page
     {
         if (MaintEquipmentCombo.SelectedItem is EquipmentListDto selected)
         {
-            // If it has a last maintenance, load it
-            if (selected.LastMaintenanceEventId.HasValue)
+            // Ensure we are in "Create New" mode by default
+            _editingMaintenanceId = null;
+            
+            // Clean fields initially
+            MaintNotesBox.Text = "";
+            MaintHasIssuesCheck.IsChecked = false;
+
+            try 
             {
-                try
-                {
-                    var lastMaint = await _equipmentService.GetLastMaintenanceAsync(selected.Id);
-                    if (lastMaint != null)
-                    {
-                        _editingMaintenanceId = lastMaint.Id;
-                        MaintDatePicker.Date = new DateTimeOffset(lastMaint.PerformedAt);
-                        
-                        // Set Type
-                        foreach (ComboBoxItem item in MaintTypeCombo.Items)
-                        {
-                            if (item.Tag?.ToString() == lastMaint.EventType.ToString())
-                            {
-                                MaintTypeCombo.SelectedItem = item;
-                                break;
-                            }
-                        }
-
-                        // Set Outcome
-                        foreach (ComboBoxItem item in MaintOutcomeCombo.Items)
-                        {
-                            if (item.Content?.ToString() == lastMaint.Outcome)
-                            {
-                                MaintOutcomeCombo.SelectedItem = item;
-                                break;
-                            }
-                        }
-
-                        MaintHasIssuesCheck.IsChecked = lastMaint.HasIssues ?? false;
-                        MaintNotesBox.Text = lastMaint.Notes ?? "";
-
-                        // Set Next Maintenance Year
-                        if (lastMaint.NextMaintenanceYear.HasValue)
-                        {
-                            foreach (ComboBoxItem item in NextMaintYearCombo.Items)
-                            {
-                                if (item.Tag?.ToString() == lastMaint.NextMaintenanceYear.Value.ToString())
-                                {
-                                    NextMaintYearCombo.SelectedItem = item;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Set Next Maintenance Month
-                        if (lastMaint.NextMaintenanceMonth.HasValue)
-                        {
-                            NextMaintMonthCombo.SelectedIndex = lastMaint.NextMaintenanceMonth.Value - 1;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error loading last maintenance: {ex.Message}");
-                }
+               // Feature Request: Pre-fill notes from previous maintenance
+               var lastMaint = await _equipmentService.GetLastMaintenanceAsync(selected.Id);
+               if (lastMaint != null)
+               {
+                   // Copy notes if available
+                   if (!string.IsNullOrWhiteSpace(lastMaint.Notes))
+                   {
+                       MaintNotesBox.Text = lastMaint.Notes;
+                   }
+                   
+                   // Optional: Pre-fill next due date logic based on previous plan? 
+                   // Accessing plans is better done via the service if we had a dedicated "GetNextMaintenanceDate" method.
+                   // For now, only Notes as requested.
+               }
             }
-            else
+            catch (Exception ex)
             {
-                _editingMaintenanceId = null;
-                // Don't reset everything, just in case user switched back and forth, 
-                // but usually we want a fresh start if no maintenance exists.
+                System.Diagnostics.Debug.WriteLine($"Error pre-filling notes: {ex.Message}");
             }
         }
     }
@@ -184,7 +148,7 @@ public sealed partial class EquipmentView : Page
                        typeStr == "CORRECTIVE" ? Shared.Models.MaintenanceEventType.CORRECTIVE :
                        Shared.Models.MaintenanceEventType.CALIBRATION;
 
-            var outcome = (MaintOutcomeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            var outcome = (MaintOutcomeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Pass";
             var maintDate = MaintDatePicker.Date.DateTime;
             var hasIssues = MaintHasIssuesCheck.IsChecked ?? false;
 
@@ -227,15 +191,47 @@ public sealed partial class EquipmentView : Page
                         nextMaintYear,
                         _authService.CurrentUserId
                     );
-                    await _equipmentService.UpdateMaintenanceAsync(updateReq);
+                    var updated = await _equipmentService.UpdateMaintenanceAsync(updateReq);
+                    if (updated != null)
+                    {
+                        selectedEq.LastMaintenanceAt = updated.PerformedAt;
+                        selectedEq.LastEventType = updated.EventType.ToString();
+                        selectedEq.LastOutcome = updated.Outcome;
+                        // Calculate next due manually for UI feedback
+                         if (nextMaintMonth.HasValue && nextMaintYear.HasValue)
+                         {
+                             try { selectedEq.NextMaintenanceDue = new DateTime(nextMaintYear.Value, nextMaintMonth.Value, 1).ToString("dd/MM/yyyy"); } catch {}
+                         }
+                    }
                 }
                 else
                 {
-                    await _equipmentService.RegisterMaintenanceAsync(req);
+                    var created = await _equipmentService.RegisterMaintenanceAsync(req);
+                    if (created != null)
+                    {
+                        selectedEq.LastMaintenanceEventId = created.Id;
+                        selectedEq.LastMaintenanceAt = created.PerformedAt;
+                        selectedEq.LastEventType = created.EventType.ToString();
+                        selectedEq.LastOutcome = created.Outcome;
+                         if (nextMaintMonth.HasValue && nextMaintYear.HasValue)
+                         {
+                             try { selectedEq.NextMaintenanceDue = new DateTime(nextMaintYear.Value, nextMaintMonth.Value, 1).ToString("dd/MM/yyyy"); } catch {}
+                         }
+                    }
                 }
                 
-                // Show success summary or just refresh
-                await LoadEquipment(); // Refresh list to show updated date
+                // Force PropertyChanged notifications if needed (DTO assumes INPC/properties bind automatically if standard objects, 
+                // but since it's a DTO we might need to refresh the item in the collection to trigger UI update)
+                // Replacing the item in the ObservableCollection triggers a UI refresh for that row.
+                var index = Equipment.IndexOf(selectedEq);
+                if (index >= 0)
+                {
+                    Equipment[index] = selectedEq; // Triggers list update
+                }
+                else
+                {
+                    await LoadEquipment(); // Fallback
+                }
 
                 // Log the action
                 var userName = _authService.CurrentUsername ?? "Unknown";

@@ -88,6 +88,7 @@ public sealed partial class MethodsView : Page
             ActivateButton.Visibility = method.Status == MethodStatus.DRAFT ? Visibility.Visible : Visibility.Collapsed;
 
             await LoadAuthorizationsAsync(method.Id);
+            await LoadVersionsAsync(method.Id);
         }
         else
         {
@@ -281,4 +282,164 @@ public sealed partial class MethodsView : Page
     public static string FormatAuthCount(int count) => count == 0 ? "Sin autorizados" : $"{count} autorizados";
     public static string FormatDate(DateTime d) => d.ToString("d");
     public static string FormatExpiry(DateTime? d) => d.HasValue ? $"Expira: {d.Value:d}" : "Sin Expiración";
+
+    private async Task LoadVersionsAsync(Guid methodId)
+    {
+        var versions = await _methodService.GetVersionsAsync(methodId);
+        if (VersionsList != null) VersionsList.ItemsSource = versions;
+        if (EmptyVersionsText != null) EmptyVersionsText.Visibility = versions.Any() ? Visibility.Collapsed : Visibility.Visible;
+
+        // Auto-load validations for the latest version if available
+        if (versions.FirstOrDefault() is MethodVersionDto latest)
+        {
+            await LoadValidationsAsync(latest.Id);
+        }
+        else
+        {
+            if (ValidationsList != null) ValidationsList.ItemsSource = null;
+            if (EmptyValidationsText != null) EmptyValidationsText.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async Task LoadValidationsAsync(Guid versionId)
+    {
+        var validations = await _methodService.GetValidationsAsync(versionId);
+        if (ValidationsList != null) ValidationsList.ItemsSource = validations;
+        if (EmptyValidationsText != null) EmptyValidationsText.Visibility = validations.Any() ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private async void NewVersion_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMethod == null) return;
+
+        var dialog = new ContentDialog
+        {
+            Title = "Nueva Versión",
+            PrimaryButtonText = "Crear Borrador",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        var stack = new StackPanel { Spacing = 12 };
+        var verBox = new TextBox { Header = "Nueva Versión", PlaceholderText = "v1.1", Text = "v" };
+        var descBox = new TextBox { Header = "Descripción del Cambio", PlaceholderText = "Revisión anual...", AcceptsReturn = true, Height = 80 };
+
+        stack.Children.Add(verBox);
+        stack.Children.Add(descBox);
+        dialog.Content = stack;
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            if (string.IsNullOrWhiteSpace(verBox.Text)) return;
+
+            var req = new CreateMethodVersionRequest(_selectedMethod.Id, verBox.Text, descBox.Text, null, "System"); 
+            await _methodService.CreateVersionAsync(req);
+            await LoadVersionsAsync(_selectedMethod.Id);
+        }
+    }
+
+    private async void ApproveVersion_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is Guid versionId)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Aprobar Versión",
+                Content = "¿Confirma que desea aprobar esta versión? Se marcará como la versión vigente y las anteriores pasarán a ser obsoletas.",
+                PrimaryButtonText = "Aprobar",
+                CloseButtonText = "Cancelar",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                await _methodService.ApproveVersionAsync(versionId, "System"); 
+                if (_selectedMethod != null)
+                {
+                    await LoadMethodsAsync(); 
+                    await LoadVersionsAsync(_selectedMethod.Id);
+                }
+            }
+        }
+    }
+
+    private async void AddValidation_Click(object sender, RoutedEventArgs e)
+    {
+        var versions = VersionsList.ItemsSource as List<MethodVersionDto>;
+        var targetVersion = versions?.FirstOrDefault();
+
+        if (targetVersion == null)
+        {
+             var errDialog = new ContentDialog
+            {
+                Title = "Error",
+                Content = "No hay versiones disponibles para validar.",
+                CloseButtonText = "Ok",
+                XamlRoot = this.Content.XamlRoot
+            };
+            await errDialog.ShowAsync();
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Registrar Validación",
+            PrimaryButtonText = "Guardar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        var stack = new StackPanel { Spacing = 12 };
+        var paramBox = new TextBox { Header = "Parámetro Validado", PlaceholderText = "Precisión, Exactitud, Linealidad..." };
+        var resBox = new TextBox { Header = "Resultado / Conclusión", PlaceholderText = "Cumple con las especificaciones...", AcceptsReturn = true, Height = 60 };
+        var countBox = new NumberBox { Header = "Nº de Experimentos", Value = 1, Minimum = 1, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+
+        stack.Children.Add(paramBox);
+        stack.Children.Add(resBox);
+        stack.Children.Add(countBox);
+        dialog.Content = stack;
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            if (string.IsNullOrWhiteSpace(paramBox.Text)) return;
+
+            var val = new MethodValidationDto(
+                Guid.NewGuid(), 
+                targetVersion.Id, 
+                paramBox.Text, 
+                resBox.Text, 
+                (int)countBox.Value, 
+                null, 
+                null
+            );
+            await _methodService.AddValidationAsync(val);
+            await LoadValidationsAsync(targetVersion.Id);
+        }
+    }
+
+    private async void ViewReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is HyperlinkButton btn && btn.Tag is string path && !string.IsNullOrEmpty(path))
+        {
+            try
+            {
+                var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+                await Windows.System.Launcher.LaunchFileAsync(file);
+            }
+            catch (Exception ex)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Error al abrir documento",
+                    Content = $"No se pudo abrir el archivo en: {path}\nError: {ex.Message}",
+                    CloseButtonText = "Ok",
+                    XamlRoot = this.Content.XamlRoot
+                };
+                await dialog.ShowAsync();
+            }
+        }
+    }
 }

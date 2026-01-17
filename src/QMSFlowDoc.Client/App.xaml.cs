@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
 using System.Net.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace QMSFlowDoc.Client;
 
@@ -57,6 +58,11 @@ public partial class App : Application
 
 
 
+    public Services.IAuditService AuditService { get; }
+
+    // Service Locator Shim
+    public static IServiceProvider Services { get; private set; }
+
     public App()
     {
         this.InitializeComponent();
@@ -68,7 +74,7 @@ public partial class App : Application
         LocalStore = new Services.LocalDocumentStore(NetworkConfigStore);
 
         AuthService = new Services.AuthService(httpClient);
-        DocumentService = new Services.DocumentService(httpClient, LocalCacheService, LocalStore, NetworkConfigStore);
+        DocumentService = new Services.DocumentService(httpClient, LocalCacheService, LocalStore, NetworkConfigStore, AuthService);
         InventoryService = new Services.InventoryService(httpClient, null, NetworkConfigStore);
         EquipmentService = new Services.EquipmentService(httpClient, null, NetworkConfigStore);
         StaffService = new Services.StaffService(httpClient, null, NetworkConfigStore);
@@ -84,7 +90,15 @@ public partial class App : Application
         EQAService = new Services.EQAService(LocalStore);
         MethodService = new Services.MethodService(LocalStore);
         ExportService = new Services.ExportService();
-        EquipmentAuditLogger = new Services.AuditLogger(ConfigurationService, NetworkConfigStore); 
+        EquipmentAuditLogger = new Services.AuditLogger(ConfigurationService, NetworkConfigStore);
+        AuditService = new Services.AuditService(LocalStore); // Initialize AuditService
+
+        // Register in shim
+        var services = new ServiceCollection();
+        services.AddSingleton(AuthService);
+        services.AddSingleton(DocumentService);
+        services.AddSingleton(AuditService); 
+        Services = services.BuildServiceProvider();
 
 
         

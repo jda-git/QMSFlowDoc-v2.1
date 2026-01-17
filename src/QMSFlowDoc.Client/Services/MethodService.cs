@@ -15,6 +15,13 @@ public interface IMethodService
     Task<List<MethodAuthorizationDto>> GetAuthorizationsAsync(Guid methodId);
     Task AuthorizeUserAsync(AuthorizeMethodRequest request);
     Task RemoveAuthorizationAsync(Guid authorizationId);
+
+    // Versioning & Validation
+    Task<List<MethodVersionDto>> GetVersionsAsync(Guid methodId);
+    Task CreateVersionAsync(CreateMethodVersionRequest request);
+    Task ApproveVersionAsync(Guid versionId, string approvedBy);
+    Task<List<MethodValidationDto>> GetValidationsAsync(Guid versionId);
+    Task AddValidationAsync(MethodValidationDto validation);
 }
 
 public class MethodService : IMethodService
@@ -39,4 +46,15 @@ public class MethodService : IMethodService
     public Task AuthorizeUserAsync(AuthorizeMethodRequest request) => _localStore.AuthorizeUserForMethodAsync(request);
 
     public Task RemoveAuthorizationAsync(Guid authorizationId) => _localStore.RemoveMethodAuthorizationAsync(authorizationId);
+
+    // Versioning Implementation
+    public Task<List<MethodVersionDto>> GetVersionsAsync(Guid methodId) => _localStore.GetMethodVersionsAsync(methodId);
+
+    public Task CreateVersionAsync(CreateMethodVersionRequest request) => _localStore.CreateMethodVersionAsync(request);
+
+    public Task ApproveVersionAsync(Guid versionId, string approvedBy) => _localStore.ApproveMethodVersionAsync(versionId, approvedBy);
+
+    public Task<List<MethodValidationDto>> GetValidationsAsync(Guid versionId) => _localStore.GetMethodValidationsAsync(versionId);
+
+    public Task AddValidationAsync(MethodValidationDto validation) => _localStore.AddMethodValidationAsync(validation);
 }

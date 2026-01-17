@@ -283,6 +283,9 @@ public sealed partial class MainWindow : Window
 
                 ContentFrame.Navigate(typeof(Views.ImprovementView));
                 break;
+            case "audit":
+                ContentFrame.Navigate(typeof(Views.AuditView));
+                break;
             case "issues":
                 ContentFrame.Navigate(typeof(Views.IssuesView));
                 break;
