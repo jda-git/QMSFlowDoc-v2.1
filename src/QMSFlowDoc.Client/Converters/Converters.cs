@@ -105,3 +105,40 @@ public class StatusToVisibilityConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+public class NullableDateConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is DateTime dt) return dt.ToString("d");
+        if (value is DateTimeOffset dto) return dto.ToString("d");
+        return "-";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+public class StatusBackgroundConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is string status)
+        {
+            return status switch
+            {
+                "Active" or "Activo" or "APTO" => new SolidColorBrush(Microsoft.UI.Colors.LightGreen),
+                "Expired" or "Expirado" or "NO APTO" => new SolidColorBrush(Microsoft.UI.Colors.LightPink),
+                _ => new SolidColorBrush(Microsoft.UI.Colors.Transparent)
+            };
+        }
+        return new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}

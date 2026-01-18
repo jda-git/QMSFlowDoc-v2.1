@@ -19,6 +19,8 @@ public class DashboardStatsDto
     public int PendingEQAResults { get; set; }
     public int ActiveMethods { get; set; }
     public int ExpiringAuthorizations { get; set; }
+    public int ExpiredCompetencies { get; set; }
+    public int PendingTrainings { get; set; }
 
     public DashboardStatsDto() { }
 }

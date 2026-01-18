@@ -12,6 +12,25 @@
     DefaultButton="Primary">
 
     <StackPanel Spacing="16" MinWidth="450">
+        <!-- Selección de Personal (Global Mode) -->
+        <ComboBox x:Name="StaffCombo" 
+                  Header="Personal"
+                  PlaceholderText="Seleccione empleado"
+                  HorizontalAlignment="Stretch"
+                  Visibility="Collapsed"
+                  DisplayMemberPath="FullName"
+                  SelectedValuePath="Id"
+                  SelectionChanged="StaffCombo_SelectionChanged"/>
+
+        <!-- Selección de Competencia (Opcional - para vincular autorización) -->
+        <ComboBox x:Name="CompetencyCombo"
+                  Header="Competencia Relacionada"
+                  PlaceholderText="Seleccione competencia"
+                  HorizontalAlignment="Stretch"
+                  DisplayMemberPath="Name"
+                  SelectedValuePath="Id"
+                  SelectionChanged="CompetencyCombo_SelectionChanged"/>
+
         <!-- Nombre de la tarea autorizada - TEXTO LIBRE -->
         <TextBox x:Name="TaskNameBox" 
                  Header="Tarea / Procedimiento Autorizado"

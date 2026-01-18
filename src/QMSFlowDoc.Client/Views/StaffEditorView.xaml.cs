@@ -32,18 +32,6 @@ public sealed partial class StaffEditorView : Page
             SaveButton.Content = "Guardar Cambios";
             UsernameBox.IsEnabled = false; // Cannot change username for now
             await LoadStaffDetails(id);
-            
-            // Show all ISO tabs in edit mode
-            TrainingTab.Visibility = Visibility.Visible;
-            CompetencyTab.Visibility = Visibility.Visible;
-            AuthorizationTab.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            // Hide ISO tabs in create mode
-            TrainingTab.Visibility = Visibility.Collapsed;
-            CompetencyTab.Visibility = Visibility.Collapsed;
-            AuthorizationTab.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -77,23 +65,6 @@ public sealed partial class StaffEditorView : Page
                     }
                 }
                 
-                // Populate Training List
-                TrainingList.ItemsSource = profile.Trainings.Select(t => new StaffTrainingDto(
-                    t.Id,
-                    t.TrainingActivityId,
-                    t.TrainingActivity?.Title ?? "Desconocido",
-                    t.TrainingActivity?.Provider ?? "",
-                    t.CompletionDate ?? DateTime.MinValue,
-                    t.TrainingActivity?.Hours ?? 0m,
-                    t.Result ?? ""
-                )).ToList();
-                
-                // Populate Competency List
-                CompetencyList.ItemsSource = await app.CompetencyService.GetStaffEvaluationsAsync(id);
-                
-                // Populate Authorization List
-                AuthorizationList.ItemsSource = await app.AuthorizationService.GetStaffAuthorizationsAsync(id);
-
                 // Show Reset Password button for Admins
                 if (app.AuthService.IsAdmin)
                 {
@@ -108,526 +79,7 @@ public sealed partial class StaffEditorView : Page
         }
     }
 
-    private async void AddTraining_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_staffId.HasValue)
-        {
-            ErrorText.Text = "Debe guardar el perfil antes de registrar formación.";
-            ErrorText.Visibility = Visibility.Visible;
-            return;
-        }
 
-        var dialog = new Views.Dialogs.AddTrainingDialog
-        {
-            XamlRoot = this.XamlRoot
-        };
-        
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-        {
-            try
-            {
-                var req = new RegisterTrainingRequest(
-                    (_staffId ?? Guid.Empty),
-                    dialog.TrainingTitle,
-                    dialog.Provider,
-                    dialog.Hours,
-                    dialog.CompletedAt,
-                    dialog.Result,
-                    dialog.Notes
-                );
-
-                var app = (App)Application.Current;
-                var success = await app.StaffService.RegisterTrainingAsync(req);
-                
-                if (success)
-                {
-                    // Refresh training list
-                    await LoadStaffDetails((_staffId ?? Guid.Empty));
-                    ErrorText.Visibility = Visibility.Collapsed;
-                }
-                else
-                {
-                    ErrorText.Text = "Error al registrar la formación.";
-                    ErrorText.Visibility = Visibility.Visible;
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorText.Text = $"Error: {ex.Message}";
-                ErrorText.Visibility = Visibility.Visible;
-            }
-        }
-    }
-
-    private async void AssessCompetency_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_staffId.HasValue)
-        {
-            ErrorText.Text = "Debe guardar el perfil antes de evaluar competencias.";
-            ErrorText.Visibility = Visibility.Visible;
-            return;
-        }
-
-        var dialog = new Views.Dialogs.AssessCompetencyDialog
-        {
-            XamlRoot = this.XamlRoot
-        };
-
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-        {
-            try
-            {
-                var req = new AssessCompetencyRequest(
-                    (_staffId ?? Guid.Empty),
-                    dialog.CompetencyName,
-                    dialog.Area,
-                    dialog.Outcome,
-                    dialog.EvaluationDate,
-                    dialog.ValidUntil,
-                    dialog.Evidence,
-                    ((App)Application.Current).AuthService.CurrentUserId
-                );
-
-                var app = (App)Application.Current;
-                var result = await app.StaffService.AssessCompetencyAsync(req);
-                
-                if (result != null)
-                {
-                    // Refresh
-                    CompetencyList.ItemsSource = await app.CompetencyService.GetStaffEvaluationsAsync((_staffId ?? Guid.Empty));
-                    ErrorText.Visibility = Visibility.Collapsed;
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorText.Text = $"Error: {ex.Message}";
-                ErrorText.Visibility = Visibility.Visible;
-            }
-        }
-    }
-
-    private async void GrantAuthorization_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_staffId.HasValue)
-        {
-            ErrorText.Text = "Debe guardar el perfil antes de emitir autorizaciones.";
-            ErrorText.Visibility = Visibility.Visible;
-            return;
-        }
-
-        var dialog = new Views.Dialogs.GrantAuthorizationDialog
-        {
-            XamlRoot = this.XamlRoot
-        };
-
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-        {
-            try
-            {
-                var req = new GrantAuthorizationRequest(
-                    (_staffId ?? Guid.Empty),
-                    dialog.TaskName,
-                    dialog.Description,
-                    dialog.ValidFrom,
-                    dialog.ValidUntil,
-                    ((App)Application.Current).AuthService.CurrentUserId
-                );
-
-                // 5.3 Competency Validation (ISO 15189)
-                var competencies = CompetencyList.ItemsSource as System.Collections.Generic.List<CompetencyEvaluationDto>;
-                bool hasCompetency = competencies != null && competencies.Any(c => 
-                    (c.CompetencyName?.IndexOf(dialog.TaskName, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (dialog.TaskName?.IndexOf(c.CompetencyName ?? "---", StringComparison.OrdinalIgnoreCase) >= 0)
-                );
-
-                if (!hasCompetency)
-                {
-                    var confirm = new ContentDialog
-                    {
-                        Title = "Advertencia de Competencia",
-                        Content = $"No se encontró una evaluación de competencia registrada que coincida con '{dialog.TaskName}'.\n\nSegún ISO 15189, el personal debe ser evaluado como competente antes de ser autorizado.\n\n¿Desea autorizar de todos modos?",
-                        PrimaryButtonText = "Sí, Autorizar",
-                        CloseButtonText = "Cancelar",
-                        DefaultButton = ContentDialogButton.Close,
-                        XamlRoot = this.XamlRoot
-                    };
-
-                    if (await confirm.ShowAsync() != ContentDialogResult.Primary)
-                    {
-                        return;
-                    }
-                }
-
-                var app = (App)Application.Current;
-                var success = await app.AuthorizationService.GrantAuthorizationAsync(req);
-                
-                if (success)
-                {
-                    // Refresh
-                    AuthorizationList.ItemsSource = await app.AuthorizationService.GetStaffAuthorizationsAsync((_staffId ?? Guid.Empty));
-                    ErrorText.Visibility = Visibility.Collapsed;
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorText.Text = $"Error: {ex.Message}";
-                ErrorText.Visibility = Visibility.Visible;
-            }
-        }
-    }
-
-    private void Back_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.GoBack();
-    }
-
-    private async void Save_Click(object sender, RoutedEventArgs e)
-    {
-        ErrorText.Visibility = Visibility.Collapsed;
-        
-        if (string.IsNullOrWhiteSpace(FullNameBox.Text) || string.IsNullOrWhiteSpace(UsernameBox.Text))
-        {
-            ErrorText.Text = "Nombre y Usuario son obligatorios.";
-            ErrorText.Visibility = Visibility.Visible;
-            return;
-        }
-
-        if (!_staffId.HasValue && string.IsNullOrWhiteSpace(PasswordBox.Password))
-        {
-            ErrorText.Text = "La contraseña es obligatoria para nuevas fichas.";
-            ErrorText.Visibility = Visibility.Visible;
-            return;
-        }
-
-        try
-        {
-            var app = (App)Application.Current;
-            var roleName = (RoleCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Consultor";
-
-            if (_staffId.HasValue)
-            {
-                // UPDATE
-                var updateRequest = new UpdateStaffProfileRequest(
-                    (_staffId ?? Guid.Empty),
-                    FullNameBox.Text,
-                    EmailBox.Text,
-                    PositionBox.Text,
-                    DepartmentBox.Text,
-                    HiredDatePicker.Date.DateTime,
-                    roleName,
-                    IsActiveCheck.IsChecked ?? true
-                );
-
-                var result = await app.StaffService.UpdateStaffProfileAsync(updateRequest);
-                if (result != null)
-                {
-                    Frame.GoBack();
-                }
-            }
-            else
-            {
-                // CREATE NEW
-                // 1. Register User
-                var regRequest = new RegisterRequest(
-                    UsernameBox.Text,
-                    PasswordBox.Password,
-                    FullNameBox.Text,
-                    EmailBox.Text,
-                    roleName
-                );
-
-                try 
-                {
-                    var userId = await app.AuthService.RegisterAsync(regRequest);
-                    if (userId == null)
-                    {
-                        ErrorText.Text = "Error desconocido al registrar usuario.";
-                        ErrorText.Visibility = Visibility.Visible;
-                        return;
-                    }
-
-                    // 2. Create Staff Profile
-                    var profileRequest = new CreateStaffProfileRequest(
-                        userId.Value,
-                        PositionBox.Text,
-                        DepartmentBox.Text,
-                        HiredDatePicker.Date.DateTime
-                    );
-
-                    var profile = await app.StaffService.CreateStaffProfileAsync(profileRequest);
-                    if (profile != null)
-                    {
-                        Frame.GoBack();
-                    }
-                }
-                catch (Exception authEx)
-                {
-                    // This will now catch the specific "username exists" or other server errors
-                    ErrorText.Text = authEx.Message;
-                    ErrorText.Visibility = Visibility.Visible;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            ErrorText.Text = $"Error: {ex.Message}";
-            ErrorText.Visibility = Visibility.Visible;
-        }
-    }
-
-    private async void EditTraining_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is Guid id)
-        {
-             var list = TrainingList.ItemsSource as System.Collections.Generic.List<StaffTrainingDto>;
-             var item = list?.FirstOrDefault(t => t.Id == id);
-             if (item == null) return;
-
-             var dialog = new Dialogs.AddTrainingDialog
-             {
-                 XamlRoot = this.XamlRoot
-             };
-             dialog.LoadData(item);
-
-             var result = await dialog.ShowAsync();
-             if (result == ContentDialogResult.Primary)
-             {
-                 var app = (App)Application.Current;
-                 // Soft-delete old record
-                 bool deleted = await app.StaffService.DeleteTrainingAsync(id);
-                 if (deleted)
-                 {
-                     // Register updated record
-                     var req = new RegisterTrainingRequest(
-                        (_staffId ?? Guid.Empty),
-                        dialog.TrainingTitle,
-                        dialog.Provider,
-                        dialog.Hours,
-                        dialog.CompletedAt,
-                        dialog.Result,
-                        dialog.Notes
-                     );
-                     await app.StaffService.RegisterTrainingAsync(req);
-                     await LoadStaffDetails((_staffId ?? Guid.Empty));
-                 }
-                 else
-                 {
-                     ErrorText.Text = "Error al actualizar (no se pudo eliminar el anterior).";
-                     ErrorText.Visibility = Visibility.Visible;
-                 }
-             }
-             else if (result == ContentDialogResult.Secondary)
-             {
-                 var app = (App)Application.Current;
-                 bool deleted = await app.StaffService.DeleteTrainingAsync(id);
-                 if (deleted)
-                 {
-                     await LoadStaffDetails((_staffId ?? Guid.Empty));
-                 }
-                 else
-                 {
-                     ErrorText.Text = "Error al eliminar el registro.";
-                     ErrorText.Visibility = Visibility.Visible;
-                 }
-             }
-        }
-    }
-
-    private async void EditCompetency_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is Guid id)
-        {
-             var list = CompetencyList.ItemsSource as System.Collections.Generic.List<CompetencyEvaluationDto>;
-             var item = list?.FirstOrDefault(t => t.Id == id);
-             if (item == null) return;
-
-             var dialog = new Dialogs.AssessCompetencyDialog
-             {
-                 XamlRoot = this.XamlRoot
-             };
-             dialog.LoadData(item);
-
-             var result = await dialog.ShowAsync();
-             if (result == ContentDialogResult.Primary)
-             {
-                 var app = (App)Application.Current;
-                 bool deleted = await app.CompetencyService.DeleteEvaluationAsync(id);
-                 if (deleted)
-                 {
-                     var req = new AssessCompetencyRequest(
-                        (_staffId ?? Guid.Empty),
-                        dialog.CompetencyName,
-                        dialog.Area,
-                        dialog.Outcome,
-                        dialog.EvaluationDate,
-                        dialog.ValidUntil,
-                        dialog.Evidence,
-                        ((App)Application.Current).AuthService.CurrentUserId
-                     );
-                     await app.StaffService.AssessCompetencyAsync(req);
-                     // Refresh
-                     CompetencyList.ItemsSource = await app.CompetencyService.GetStaffEvaluationsAsync((_staffId ?? Guid.Empty));
-                 }
-                 else
-                 {
-                     ErrorText.Text = "Error al actualizar (no se pudo eliminar el anterior).";
-                     ErrorText.Visibility = Visibility.Visible;
-                 }
-             }
-             else if (result == ContentDialogResult.Secondary)
-             {
-                 var app = (App)Application.Current;
-                 bool deleted = await app.CompetencyService.DeleteEvaluationAsync(id);
-                 if (deleted)
-                 {
-                     CompetencyList.ItemsSource = await app.CompetencyService.GetStaffEvaluationsAsync((_staffId ?? Guid.Empty));
-                 }
-                 else
-                 {
-                     ErrorText.Text = "Error al eliminar la competencia.";
-                     ErrorText.Visibility = Visibility.Visible;
-                 }
-             }
-        }
-    }
-
-    private async void EditAuthorization_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is Guid id)
-        {
-             var list = AuthorizationList.ItemsSource as System.Collections.Generic.List<StaffAuthorizationDto>;
-             var item = list?.FirstOrDefault(t => t.Id == id);
-             if (item == null) return;
-
-             var dialog = new Dialogs.GrantAuthorizationDialog
-             {
-                 XamlRoot = this.XamlRoot
-             };
-             dialog.LoadData(item);
-
-             var result = await dialog.ShowAsync();
-             if (result == ContentDialogResult.Primary)
-             {
-                 var app = (App)Application.Current;
-                 bool deleted = await app.AuthorizationService.DeleteAuthorizationAsync(id);
-                 if (deleted)
-                 {
-                     var req = new GrantAuthorizationRequest(
-                        (_staffId ?? Guid.Empty),
-                        dialog.TaskName,
-                        dialog.Description,
-                        dialog.ValidFrom,
-                        dialog.ValidUntil,
-                        ((App)Application.Current).AuthService.CurrentUserId
-                     );
-
-                    // 5.3 Competency Validation (ISO 15189)
-                    var competencies = CompetencyList.ItemsSource as System.Collections.Generic.List<CompetencyEvaluationDto>;
-                    bool hasCompetency = competencies != null && competencies.Any(c => 
-                        (c.CompetencyName?.IndexOf(dialog.TaskName, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                        (dialog.TaskName?.IndexOf(c.CompetencyName ?? "---", StringComparison.OrdinalIgnoreCase) >= 0)
-                    );
-
-                    if (!hasCompetency)
-                    {
-                        var confirm = new ContentDialog
-                        {
-                            Title = "Advertencia de Competencia",
-                            Content = $"No se encontró una evaluación de competencia registrada que coincida con '{dialog.TaskName}'.\n\n¿Desea actualizar la autorización de todos modos?",
-                            PrimaryButtonText = "Sí, Actualizar",
-                            CloseButtonText = "Cancelar",
-                            DefaultButton = ContentDialogButton.Close,
-                            XamlRoot = this.XamlRoot
-                        };
-
-                        if (await confirm.ShowAsync() != ContentDialogResult.Primary)
-                        {
-                            // If cancelled, we must restore the deleted item? 
-                            // Actually, we already deleted it in the previous step (Soft-delete).
-                            // If we cancel here, we are in a bad state (deleted but not recreated).
-                            // We should probably do the check BEFORE deleting.
-                            // But keeping it simple: Warn user they are about to save. 
-                            // Ideally check before Delete.
-                        }
-                     }
-
-                     await app.AuthorizationService.GrantAuthorizationAsync(req);
-                     // Refresh
-                     AuthorizationList.ItemsSource = await app.AuthorizationService.GetStaffAuthorizationsAsync((_staffId ?? Guid.Empty));
-                 }
-                 else
-                 {
-                     ErrorText.Text = "Error al actualizar (no se pudo eliminar el anterior).";
-                     ErrorText.Visibility = Visibility.Visible;
-                 }
-             }
-             else if (result == ContentDialogResult.Secondary)
-             {
-                 var app = (App)Application.Current;
-                 bool deleted = await app.AuthorizationService.DeleteAuthorizationAsync(id);
-                 if (deleted)
-                 {
-                     AuthorizationList.ItemsSource = await app.AuthorizationService.GetStaffAuthorizationsAsync((_staffId ?? Guid.Empty));
-                 }
-                 else
-                 {
-                     ErrorText.Text = "Error al eliminar la autorización.";
-                     ErrorText.Visibility = Visibility.Visible;
-                 }
-             }
-        }
-    }
-
-    
-    private async void PrintTrainingPlan_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_staffId.HasValue)
-        {
-            ErrorText.Text = "No se puede imprimir el plan sin guardar primero el perfil.";
-            ErrorText.Visibility = Visibility.Visible;
-            return;
-        }
-
-        try
-        {
-            var app = (App)Application.Current;
-            var profile = await app.StaffService.GetStaffProfileByIdAsync((_staffId ?? Guid.Empty));
-            if (profile == null)
-            {
-                ErrorText.Text = "No se pudo encontrar el expediente para imprimir.";
-                ErrorText.Visibility = Visibility.Visible;
-                return;
-            }
-
-            var competencies = CompetencyList.ItemsSource as System.Collections.Generic.List<CompetencyEvaluationDto> ?? new System.Collections.Generic.List<CompetencyEvaluationDto>();
-            var authorizations = AuthorizationList.ItemsSource as System.Collections.Generic.List<StaffAuthorizationDto> ?? new System.Collections.Generic.List<StaffAuthorizationDto>();
-
-            var config = await app.NetworkConfigStore.LoadAsync();
-            var reportsDir = System.IO.Path.Combine(config.LocalBasePath, "Informes");
-            System.IO.Directory.CreateDirectory(reportsDir);
-
-            var fileName = $"PlanFormacion_{profile.User?.Username}_{DateTime.Now:yyyyMMdd}.pdf";
-            var outputPath = System.IO.Path.Combine(reportsDir, fileName);
-
-            app.PrintingService.GenerateTrainingPlan(
-                profile, 
-                competencies, 
-                authorizations, 
-                outputPath, 
-                app.AuthService.CurrentUsername ?? "Sistema"
-            );
-
-            // Open PDF
-            var p = new System.Diagnostics.Process();
-            p.StartInfo = new System.Diagnostics.ProcessStartInfo(outputPath) { UseShellExecute = true };
-            p.Start();
-        }
-        catch (Exception ex)
-        {
-            ErrorText.Text = $"Error al generar informe: {ex.Message}";
-            ErrorText.Visibility = Visibility.Visible;
-        }
-    }
     private async void ResetPassword_Click(object sender, RoutedEventArgs e)
     {
         if (!_userId.HasValue) return;
@@ -655,6 +107,125 @@ public sealed partial class StaffEditorView : Page
                 ErrorText.Text = $"Error: {ex.Message}";
                 ErrorText.Visibility = Visibility.Visible;
             }
+        }
+    }
+    private async void Save_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SaveButton.IsEnabled = false;
+            ErrorText.Visibility = Visibility.Collapsed;
+
+            var app = (App)Application.Current;
+            var fullName = FullNameBox.Text.Trim();
+            var email = EmailBox.Text.Trim();
+            var username = UsernameBox.Text.Trim();
+            var position = PositionBox.Text.Trim();
+            var department = DepartmentBox.Text.Trim();
+            var hired = HiredDatePicker.Date.DateTime;
+            var roleItem = RoleCombo.SelectedItem as ComboBoxItem;
+            var roleName = roleItem?.Tag?.ToString() ?? "Staff";
+            var isActive = IsActiveCheck.IsChecked ?? true;
+
+            if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(username))
+            {
+                ErrorText.Text = "Nombre completo y usuario son obligatorios.";
+                ErrorText.Visibility = Visibility.Visible;
+                SaveButton.IsEnabled = true;
+                return;
+            }
+
+            if (_staffId.HasValue)
+            {
+                // Update
+                var updateReq = new UpdateStaffProfileRequest(
+                    _staffId.Value,
+                    fullName,
+                    email,
+                    position,
+                    department,
+                    hired,
+                    roleName,
+                    isActive
+                );
+
+                var result = await app.StaffService.UpdateStaffProfileAsync(updateReq);
+                if (result != null)
+                {
+                    Frame.GoBack();
+                }
+                else
+                {
+                    ErrorText.Text = "Error al actualizar perfil.";
+                    ErrorText.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                // Create
+                var password = PasswordBox.Password;
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    ErrorText.Text = "La contraseña es obligatoria para nuevos usuarios.";
+                    ErrorText.Visibility = Visibility.Visible;
+                    SaveButton.IsEnabled = true;
+                    return;
+                }
+
+                // 1. Create User
+                var regReq = new RegisterRequest(
+                    username,
+                    password,
+                    fullName,
+                    email,
+                    roleName
+                );
+
+                var userId = await app.AuthService.RegisterAsync(regReq);
+                
+                if (userId != null)
+                {
+                    // 2. Create Profile
+                    var profileReq = new CreateStaffProfileRequest(
+                        userId.Value,
+                        position,
+                        department,
+                        hired
+                    );
+
+                    var profile = await app.StaffService.CreateStaffProfileAsync(profileReq);
+                    if (profile != null)
+                    {
+                        Frame.GoBack();
+                    }
+                    else
+                    {
+                        ErrorText.Text = "Usuario creado, pero falló la creación del perfil.";
+                        ErrorText.Visibility = Visibility.Visible;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorText.Text = $"Error: {ex.Message}";
+            ErrorText.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            SaveButton.IsEnabled = true;
+        }
+    }
+
+    private void Back_Click(object sender, RoutedEventArgs e)
+    {
+        if (Frame.CanGoBack)
+        {
+            Frame.GoBack();
+        }
+        else
+        {
+            // Initial navigation fallback if any
         }
     }
 }

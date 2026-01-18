@@ -19,7 +19,14 @@ public sealed partial class AddTrainingDialog : ContentDialog
         TitleBox.Text = dto.Title;
         ProviderBox.Text = dto.Provider;
         HoursBox.Text = dto.Hours.ToString();
-        CompletionDatePicker.Date = dto.CompletionDate;
+        if (dto.CompletionDate > DateTime.MinValue)
+        {
+            CompletionDatePicker.Date = dto.CompletionDate;
+        }
+        else
+        {
+            CompletionDatePicker.Date = null;
+        }
         
         foreach(ComboBoxItem item in ResultCombo.Items)
         {
@@ -30,8 +37,11 @@ public sealed partial class AddTrainingDialog : ContentDialog
             }
         }
         
-        // Note: Notes are not in DTO currently, might be empty
-        // Title text update
+        if (dto.CompetencyId.HasValue)
+        {
+            CompetencyCombo.SelectedValue = dto.CompetencyId.Value;
+        }
+
         this.Title = "Editar Formación";
         this.PrimaryButtonText = "Guardar";
         this.SecondaryButtonText = "Eliminar"; // Enable Delete button
@@ -47,17 +57,67 @@ public sealed partial class AddTrainingDialog : ContentDialog
         this.PrimaryButtonClick += AddTrainingDialog_PrimaryButtonClick;
     }
 
+    public string? SelectedStaffId { get; private set; }
+
+    public void EnableStaffSelection(System.Collections.Generic.IEnumerable<StaffListDto> staffList)
+    {
+        StaffCombo.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
+        StaffCombo.ItemsSource = staffList;
+    }
+
+    public Guid? SelectedCompetencyId { get; private set; }
+
+    public void LoadCompetencies(System.Collections.Generic.IEnumerable<CompetencyDto> competencies)
+    {
+        CompetencyCombo.ItemsSource = competencies;
+    }
+
+    private void CompetencyCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+         if (CompetencyCombo.SelectedItem is CompetencyDto comp)
+         {
+             if (string.IsNullOrWhiteSpace(TitleBox.Text))
+             {
+                 TitleBox.Text = $"Formación: {comp.Name}";
+             }
+         }
+    }
+
     private void AddTrainingDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
+        // Validar personal si es visible
+        if (StaffCombo.Visibility == Microsoft.UI.Xaml.Visibility.Visible)
+        {
+            if (StaffCombo.SelectedValue == null)
+            {
+                // Show error or just cancel? ContentDialog doesn't easily support inline error without extra UI.
+                // For now, we rely on user seeing it empty. Maybe focus it.
+                StaffCombo.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+                args.Cancel = true;
+                return;
+            }
+            SelectedStaffId = StaffCombo.SelectedValue.ToString();
+        }
+
+        if (CompetencyCombo.SelectedValue != null)
+        {
+            if (Guid.TryParse(CompetencyCombo.SelectedValue.ToString(), out var compId))
+            {
+                SelectedCompetencyId = compId;
+            }
+        }
+
         // Validar título obligatorio
         if (string.IsNullOrWhiteSpace(TitleBox.Text))
         {
+            TitleBox.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
             args.Cancel = true;
             return;
         }
 
         if (!CompletionDatePicker.Date.HasValue)
         {
+            CompletionDatePicker.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
             args.Cancel = true;
             return;
         }

@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System;
+using System.Linq;
 using QMSFlowDoc.Client.Services;
 using QMSFlowDoc.Shared.DTOs;
 using QMSFlowDoc.Client.Views.Dialogs;
@@ -45,6 +46,38 @@ public sealed partial class MainWindow : Window
         this.Content.PointerMoved += (s, e) => ResetInactivity();
         this.Content.KeyDown += (s, e) => ResetInactivity();
         this.Content.PointerPressed += (s, e) => ResetInactivity();
+        
+        // Hook window closing event for sync
+        this.Closed += MainWindow_Closed;
+    }
+
+    private async void MainWindow_Closed(object sender, WindowEventArgs args)
+    {
+        try
+        {
+            var app = (App)Application.Current;
+            
+            // Check if there are local changes to upload
+            if (await app.NetworkConfigStore.ValidatePathsAsync())
+            {
+                var pendingChanges = await app.NetworkSyncService.GetPendingChangesAsync();
+                var uploadsNeeded = pendingChanges.Where(c => c.Direction == Services.Sync.SyncDirection.Upload).ToList();
+                
+                if (uploadsNeeded.Any())
+                {
+                    // Upload local changes silently on close (Last Write Wins)
+                    foreach (var change in uploadsNeeded)
+                    {
+                        change.ConflictResolution = Services.Sync.SyncDirection.Upload;
+                    }
+                    await app.NetworkSyncService.ExecuteSyncAsync(uploadsNeeded);
+                }
+            }
+        }
+        catch
+        {
+            // Don't block app closing on sync failure
+        }
     }
 
     private void ResetInactivity()
@@ -143,18 +176,48 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            // Disable button during sync
+            var app = (App)Application.Current;
+            
+            // Check if paths are configured
+            if (!await app.NetworkConfigStore.ValidatePathsAsync())
+            {
+                SyncStatusText.Text = "Rutas no configuradas";
+                SyncStatusText.Foreground = new SolidColorBrush(Colors.Orange);
+                return;
+            }
+            
+            // Get pending changes
+            var pendingChanges = await app.NetworkSyncService.GetPendingChangesAsync();
+            if (!pendingChanges.Any())
+            {
+                SyncStatusText.Text = "Sin cambios pendientes";
+                SyncStatusText.Foreground = new SolidColorBrush(Colors.Green);
+                return;
+            }
+            
+            // Show confirmation dialog
+            var dialog = new Views.Dialogs.SyncConfirmationDialog(pendingChanges);
+            dialog.XamlRoot = this.Content.XamlRoot;
+            
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+            {
+                SyncStatusText.Text = "Sincronización cancelada";
+                SyncStatusText.Foreground = new SolidColorBrush(Colors.Gray);
+                return;
+            }
+            
+            // Execute sync
             SyncButton.IsEnabled = false;
             SyncStatusText.Text = "Sincronizando...";
             SyncStatusText.Foreground = new SolidColorBrush(Colors.Blue);
             
-            var syncEngine = ((App)Application.Current).DriveSyncEngine;
-            await syncEngine.RunSyncAsync();
+            await app.NetworkSyncService.ExecuteSyncAsync(dialog.ApprovedChanges);
             
             SyncStatusText.Text = "Sincronizado";
             SyncStatusText.Foreground = new SolidColorBrush(Colors.Green);
             
-            // Update status immediately after sync
+            // Update status
             await UpdateSyncStatusAsync();
         }
         catch (Exception ex)
@@ -272,6 +335,18 @@ public sealed partial class MainWindow : Window
                 break;
             case "personal":
                 ContentFrame.Navigate(typeof(Views.StaffView));
+                break;
+            case "competencies_catalog":
+                ContentFrame.Navigate(typeof(Views.CompetencyCatalogView));
+                break;
+            case "competencies_matrix":
+                ContentFrame.Navigate(typeof(Views.CompetencyMatrixView));
+                break;
+            case "competencies_training":
+                ContentFrame.Navigate(typeof(Views.CompetencyTrainingView));
+                break;
+            case "competencies_auth":
+                ContentFrame.Navigate(typeof(Views.CompetencyAuthView));
                 break;
             case "eqa":
                 ContentFrame.Navigate(typeof(Views.EQAView));

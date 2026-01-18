@@ -11,6 +11,10 @@
             <local:StringVisibilityConverter x:Key="StringVisibilityConverter" />
             <local:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
             <local:PerformanceColorConverter x:Key="PerformanceColorConverter" />
+            <local:DateConverter x:Key="DateConverter" />
+            <local:NullableDateConverter x:Key="NullableDateConverter" />
+            <local:NullToVisibilityConverter x:Key="NullVisibilityConverter" />
+            <local:StatusBackgroundConverter x:Key="StatusBackgroundConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

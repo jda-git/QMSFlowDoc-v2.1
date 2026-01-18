@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="QMSFlowDoc.Client.Views.Dialogs.SyncConfirmationDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Cambios Pendientes de Sincronización"
+    PrimaryButtonText="Sincronizar"
+    CloseButtonText="Cancelar"
+    DefaultButton="Primary"
+    MinWidth="600">
+
+    <StackPanel Spacing="16">
+        <TextBlock TextWrapping="Wrap" Opacity="0.8">
+            Se han detectado diferencias entre tu carpeta local y el repositorio de red. 
+            Revisa los cambios antes de sincronizar.
+        </TextBlock>
+
+        <!-- Downloads Section -->
+        <StackPanel x:Name="DownloadsSection" Visibility="Collapsed">
+            <TextBlock FontWeight="SemiBold" Foreground="#4CAF50">
+                📥 DESCARGAR (Red → Local)
+            </TextBlock>
+            <ListView x:Name="DownloadsList" 
+                      MaxHeight="120" 
+                      SelectionMode="None"
+                      Margin="0,8,0,0">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding RelativePath}" 
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{Binding RelativePath}"/>
+                            <TextBlock Grid.Column="1" 
+                                       Text="{Binding NetworkModified}" 
+                                       Opacity="0.6"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </StackPanel>
+
+        <!-- Uploads Section -->
+        <StackPanel x:Name="UploadsSection" Visibility="Collapsed">
+            <TextBlock FontWeight="SemiBold" Foreground="#2196F3">
+                📤 SUBIR (Local → Red)
+            </TextBlock>
+            <ListView x:Name="UploadsList" 
+                      MaxHeight="120" 
+                      SelectionMode="None"
+                      Margin="0,8,0,0">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding RelativePath}" 
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{Binding RelativePath}"/>
+                            <TextBlock Grid.Column="1" 
+                                       Text="{Binding LocalModified}" 
+                                       Opacity="0.6"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </StackPanel>
+
+        <!-- Conflicts Section -->
+        <StackPanel x:Name="ConflictsSection" Visibility="Collapsed">
+            <TextBlock FontWeight="SemiBold" Foreground="#FF9800">
+                ⚠️ CONFLICTOS (Modificado en ambos lados)
+            </TextBlock>
+            <TextBlock TextWrapping="Wrap" Opacity="0.7" Margin="0,4,0,8" FontSize="12">
+                Selecciona qué versión mantener para cada archivo:
+            </TextBlock>
+            <ListView x:Name="ConflictsList" 
+                      MaxHeight="150" 
+                      SelectionMode="None"
+                      Margin="0,0,0,0">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnSpacing="8" Padding="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{Binding RelativePath}" 
+                                           TextTrimming="CharacterEllipsis"
+                                           FontWeight="SemiBold"/>
+                                <StackPanel Orientation="Horizontal" Opacity="0.6">
+                                    <TextBlock Text="Local: " FontSize="11"/>
+                                    <TextBlock Text="{Binding LocalModified}" FontSize="11"/>
+                                    <TextBlock Text=" | Red: " FontSize="11"/>
+                                    <TextBlock Text="{Binding NetworkModified}" FontSize="11"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <Button Grid.Column="1" 
+                                    Content="Usar Local" 
+                                    Click="UseLocal_Click"
+                                    Tag="{Binding}"
+                                    Padding="8,4"/>
+                            <Button Grid.Column="2" 
+                                    Content="Usar Red" 
+                                    Click="UseNetwork_Click"
+                                    Tag="{Binding}"
+                                    Padding="8,4"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </StackPanel>
+
+        <!-- Summary -->
+        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                CornerRadius="4" 
+                Padding="12">
+            <TextBlock x:Name="SummaryText" TextWrapping="Wrap"/>
+        </Border>
+    </StackPanel>
+</ContentDialog>

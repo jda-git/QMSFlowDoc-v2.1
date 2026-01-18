@@ -181,11 +181,19 @@ public sealed partial class ConfigurationView : Page
         {
             var app = (App)Application.Current;
             
+            // Verificar configuración
+            if (!await app.NetworkConfigStore.ValidatePathsAsync())
+            {
+                StatusText.Text = "❌ Rutas de red/local no configuradas.";
+                StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Orange);
+                return;
+            }
+            
             StatusText.Text = "⏳ Sincronización en progreso...";
             StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Blue);
             
-            // Ejecutar sync manual
-            await app.DriveSyncEngine.RunSyncAsync();
+            // Ejecutar sync manual usando NetworkSyncService
+            await app.NetworkSyncService.SyncAllAsync();
             
             StatusText.Text = "✅ Sincronización completa finalizada.";
             StatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green);
@@ -197,13 +205,28 @@ public sealed partial class ConfigurationView : Page
         }
     }
 
-    private void ViewSyncLog_Click(object sender, RoutedEventArgs e)
+    private async void ViewSyncLog_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var logPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "QMSFlowDoc", "Logs");
+            var app = (App)Application.Current;
+            var localPath = await app.NetworkConfigStore.GetLocalBasePathAsync();
+            
+            string logPath;
+            if (!string.IsNullOrEmpty(localPath))
+            {
+                logPath = Path.Combine(localPath, "Base_datos", "Logs");
+            }
+            else
+            {
+                // Fallback to AppData if not configured
+                logPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "QMSFlowDoc", "Logs");
+            }
+            
+            // Create directory if it doesn't exist
+            Directory.CreateDirectory(logPath);
             
             // Abrir carpeta de logs en Explorer
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo

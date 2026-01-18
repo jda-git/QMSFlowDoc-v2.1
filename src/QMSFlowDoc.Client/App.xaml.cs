@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
+using System.Linq;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -85,7 +86,7 @@ public partial class App : Application
         FolderService = new Services.FolderService(httpClient, null, NetworkConfigStore);
         ConfigurationService = new Services.ConfigurationService(httpClient, NetworkConfigStore);
         TrainingService = new Services.TrainingService(httpClient, null, NetworkConfigStore);
-        CompetencyService = new Services.CompetencyService(httpClient, NetworkConfigStore);
+        CompetencyService = new Services.CompetencyService(NetworkConfigStore);
         AuthorizationService = new Services.AuthorizationService(httpClient, NetworkConfigStore);
         EQAService = new Services.EQAService(LocalStore);
         MethodService = new Services.MethodService(LocalStore);
@@ -154,6 +155,13 @@ public partial class App : Application
                 if (await NetworkConfigStore.ValidatePathsAsync())
                 {
                     await NetworkConfigStore.InitializeStructureAsync();
+                    
+                    // Set sync logger to use the configured local path
+                    var localPath = await NetworkConfigStore.GetLocalBasePathAsync();
+                    if (!string.IsNullOrEmpty(localPath))
+                    {
+                        SyncLogger.SetBasePath(localPath);
+                    }
                 }
             }
             catch { /* Not configured or network down */ }
@@ -171,6 +179,9 @@ public partial class App : Application
             else
             {
                 NavigateToMain();
+                
+                // Check for pending sync changes after main window is shown
+                await CheckAndRunStartupSyncAsync();
             }
 
             Window.Activate();
@@ -195,6 +206,39 @@ public partial class App : Application
         if (Window is MainWindow mw)
         {
             mw.ShowMain();
+        }
+    }
+
+    private async System.Threading.Tasks.Task CheckAndRunStartupSyncAsync()
+    {
+        try
+        {
+            // Only run if paths are configured
+            if (!await NetworkConfigStore.ValidatePathsAsync()) return;
+
+            var config = await NetworkConfigStore.LoadAsync();
+            if (!config.AutoSyncOnStartup) return;
+
+            // Check for pending changes
+            var pendingChanges = await NetworkSyncService.GetPendingChangesAsync();
+            if (!pendingChanges.Any()) return;
+
+            // Show confirmation dialog
+            var dialog = new Views.Dialogs.SyncConfirmationDialog(pendingChanges);
+            if (Window?.Content is FrameworkElement fe)
+            {
+                dialog.XamlRoot = fe.XamlRoot;
+            }
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                await NetworkSyncService.ExecuteSyncAsync(dialog.ApprovedChanges);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SyncLogger.LogErrorAsync("Startup sync failed", ex);
         }
     }
 }

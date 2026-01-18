@@ -14,6 +14,24 @@
     <StackPanel Spacing="16" MinWidth="450">
         <TextBlock Text="Introduzca los datos de la formación completada." TextWrapping="Wrap"/>
         
+        <!-- Selección de Personal (Global Mode) -->
+        <ComboBox x:Name="StaffCombo" 
+                  Header="Personal"
+                  PlaceholderText="Seleccione empleado"
+                  HorizontalAlignment="Stretch"
+                  Visibility="Collapsed"
+                  DisplayMemberPath="FullName"
+                  SelectedValuePath="Id"/>
+
+        <!-- Selección de Competencia (Opcional) -->
+        <ComboBox x:Name="CompetencyCombo"
+                  Header="Competencia Relacionada (Opcional)"
+                  PlaceholderText="Seleccione competencia..."
+                  HorizontalAlignment="Stretch"
+                  DisplayMemberPath="Name"
+                  SelectedValuePath="Id"
+                  SelectionChanged="CompetencyCombo_SelectionChanged"/>
+
         <!-- Título del curso - TEXTO LIBRE -->
         <TextBox x:Name="TitleBox" 
                  Header="Título del Curso / Actividad"

@@ -64,7 +64,20 @@ public record RegisterTrainingRequest(
     decimal Hours,
     DateTime CompletedAt,
     string Result,
-    string? Notes
+    string? Notes,
+    Guid? CompetencyId = null
+);
+
+public record UpdateTrainingRequest(
+    Guid Id,
+    Guid StaffId,
+    string Title,
+    string? Provider,
+    decimal Hours,
+    DateTime CompletedAt,
+    string Result,
+    string? Notes,
+    Guid? CompetencyId = null
 );
 
 // Evaluación de competencia - ahora con texto libre
@@ -85,6 +98,9 @@ public record GrantAuthorizationRequest(
     string TaskName,
     string? Description,
     DateTime ValidFrom,
+
     DateTime? ValidUntil,
-    Guid? GrantedByUserId = null
+    Guid? GrantedByUserId = null,
+    Guid? CompetencyId = null,
+    Guid? EvaluationId = null
 );

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="QMSFlowDoc.Client.Views.Dialogs.EvaluateCompetencyDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Evaluación de Competencia"
+    PrimaryButtonText="Guardar"
+    CloseButtonText="Cancelar"
+    DefaultButton="Primary">
+
+    <StackPanel Spacing="16" MinWidth="450">
+        <TextBlock Text="Registre la evaluación de la competencia." TextWrapping="Wrap" Foreground="Gray"/>
+        
+        <!-- Selección de Personal -->
+        <ComboBox x:Name="StaffCombo" 
+                  Header="Personal"
+                  PlaceholderText="Seleccione empleado"
+                  HorizontalAlignment="Stretch"
+                  Visibility="Visible"
+                  DisplayMemberPath="FullName"
+                  SelectedValuePath="Id"/>
+
+        <!-- Selección de Competencia -->
+        <ComboBox x:Name="CompetencyCombo"
+                  Header="Competencia Evaluada"
+                  PlaceholderText="Seleccione competencia..."
+                  HorizontalAlignment="Stretch"
+                  DisplayMemberPath="Name"
+                  SelectedValuePath="Id"/>
+
+        <!-- Fechas -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <CalendarDatePicker x:Name="EvaluationDatePicker"
+                               Grid.Column="0"
+                               Header="Fecha Evaluación"
+                               HorizontalAlignment="Stretch"
+                               Margin="0,0,6,0"/>
+            <CalendarDatePicker x:Name="ValidUntilDatePicker"
+                               Grid.Column="1"
+                               Header="Válido Hasta (Opcional)"
+                               HorizontalAlignment="Stretch"
+                               Margin="6,0,0,0"/>
+        </Grid>
+
+        <!-- Method & Result -->
+        <Grid>
+             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+            
+            <TextBox x:Name="MethodBox"
+                     Header="Método / Evidencia"
+                     PlaceholderText="Ej: Observación directa, Examen"
+                     HorizontalAlignment="Stretch"
+                     Margin="0,0,6,0"/>
+            
+            <ComboBox x:Name="OutcomeCombo"
+                      Grid.Column="1"
+                      Header="Resultado"
+                      HorizontalAlignment="Stretch"
+                      SelectedIndex="0"
+                      Margin="6,0,0,0">
+                <ComboBoxItem Content="Competent" Tag="Competent"/>
+                <ComboBoxItem Content="Training Needed" Tag="Training Needed"/>
+                <ComboBoxItem Content="Not Competent" Tag="Not Competent"/>
+            </ComboBox>
+        </Grid>
+        
+        <TextBox x:Name="EvaluatorBox"
+                 Header="Evaluador"
+                 PlaceholderText="Nombre del evaluador"
+                 HorizontalAlignment="Stretch"/>
+
+        <TextBox x:Name="NotesBox"
+                 Header="Notas / Áreas de Mejora"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 Height="60"/>
+    </StackPanel>
+</ContentDialog>

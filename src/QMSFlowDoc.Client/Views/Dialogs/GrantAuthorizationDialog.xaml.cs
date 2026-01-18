@@ -34,17 +34,72 @@ public sealed partial class GrantAuthorizationDialog : ContentDialog
         this.PrimaryButtonClick += GrantAuthorizationDialog_PrimaryButtonClick;
     }
 
+    public string? SelectedStaffId { get; private set; }
+
+    public void EnableStaffSelection(System.Collections.Generic.IEnumerable<StaffListDto> staffList)
+    {
+        StaffCombo.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
+        StaffCombo.ItemsSource = staffList;
+    }
+
+    public Guid? SelectedCompetencyId { get; private set; }
+
+    public void LoadCompetencies(System.Collections.Generic.IEnumerable<CompetencyDto> competencies)
+    {
+        CompetencyCombo.ItemsSource = competencies;
+    }
+
+    private void StaffCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Future: Filter competencies based on staff?
+    }
+
+    private void CompetencyCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+         if (CompetencyCombo.SelectedItem is CompetencyDto comp)
+         {
+             if (string.IsNullOrWhiteSpace(TaskNameBox.Text))
+             {
+                 TaskNameBox.Text = $"Autorización para: {comp.Name}";
+             }
+         }
+    }
+
     private void GrantAuthorizationDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
+        // Validar personal si es visible
+        if (StaffCombo.Visibility == Microsoft.UI.Xaml.Visibility.Visible)
+        {
+            if (StaffCombo.SelectedValue == null)
+            {
+                StaffCombo.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+                args.Cancel = true;
+                return;
+            }
+            SelectedStaffId = StaffCombo.SelectedValue.ToString();
+        }
+
+
+
+        if (CompetencyCombo.SelectedValue != null)
+        {
+            if (Guid.TryParse(CompetencyCombo.SelectedValue.ToString(), out var compId))
+            {
+                SelectedCompetencyId = compId;
+            }
+        }
+
         // Validar nombre de tarea obligatorio
         if (string.IsNullOrWhiteSpace(TaskNameBox.Text))
         {
+            TaskNameBox.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
             args.Cancel = true;
             return;
         }
         
         if (!FromDate.Date.HasValue)
         {
+            FromDate.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
             args.Cancel = true;
             return;
         }

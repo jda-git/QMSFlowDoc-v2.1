@@ -26,6 +26,14 @@
                 <NavigationViewItem Content="Inventario" Icon="Library" Tag="inventory" />
                 <NavigationViewItem Content="Equipos" Icon="Setting" Tag="equipment" />
                 <NavigationViewItem Content="Personal" Icon="Contact" Tag="personal" />
+                <NavigationViewItem Content="Competencias" Icon="AllApps" Tag="competencies_group" SelectsOnInvoked="False">
+                    <NavigationViewItem.MenuItems>
+                        <NavigationViewItem Content="Catálogo" Tag="competencies_catalog" Icon="Library"/>
+                        <NavigationViewItem Content="Matriz Visual" Tag="competencies_matrix" Icon="ViewAll"/>
+                        <NavigationViewItem Content="Formación" Tag="competencies_training" Icon="Read"/>
+                        <NavigationViewItem Content="Autorizaciones" Tag="competencies_auth" Icon="Permissions"/>
+                    </NavigationViewItem.MenuItems>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Control de Calidad (EQA)" Icon="World" Tag="eqa" />
                 <NavigationViewItem Content="Métodos" Icon="Library" Tag="methods" />
                 <NavigationViewItem Content="Mejoras" Icon="Highlight" Tag="improvement" />

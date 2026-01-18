@@ -18,6 +18,8 @@ public interface IStaffService
     Task<bool> DeleteStaffProfileAsync(Guid id);
     Task<bool> RegisterTrainingAsync(RegisterTrainingRequest request);
     Task<bool> DeleteTrainingAsync(Guid trainingId);
+    Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request);
+    Task<IEnumerable<GlobalTrainingDto>> GetAllTrainingsAsync(string? staffName = null, string? competencyName = null, DateTime? fromDate = null, DateTime? toDate = null);
     Task<CompetencyEvaluation?> AssessCompetencyAsync(AssessCompetencyRequest request);
 }
 
@@ -148,15 +150,37 @@ public class StaffService : IStaffService
         catch
         {
             var store = await GetLocalStoreAsync();
-            await store.RegisterTrainingAsync(
-                request.StaffId, 
-                request.Title, 
-                request.Provider, 
-                request.Hours, 
-                request.CompletedAt, 
-                request.Result, 
-                request.Notes);
+            await store.RegisterTrainingAsync(request);
             return true;
+        }
+    }
+
+    public async Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"staff/training/{request.Id}", request);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.UpdateTrainingAsync(request);
+        }
+    }
+
+    public async Task<IEnumerable<GlobalTrainingDto>> GetAllTrainingsAsync(string? staffName = null, string? competencyName = null, DateTime? fromDate = null, DateTime? toDate = null)
+    {
+        try
+        {
+            // Try HTTP if API exists (future proofing), but for now fallback to Local
+            // If we implement API later, we'd add query params here.
+            throw new NotImplementedException(); // Force fallback
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetAllTrainingsAsync(staffName, competencyName, fromDate, toDate);
         }
     }
 

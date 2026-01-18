@@ -9,10 +9,12 @@ public class DateConverter : IValueConverter
     {
         if (value is DateTime dt)
         {
+            if (dt == DateTime.MinValue) return "";
             return dt.ToLocalTime().ToString("d");
         }
         if (value is DateTimeOffset dto)
         {
+            if (dto == DateTimeOffset.MinValue) return "";
             return dto.ToLocalTime().ToString("d");
         }
         return value;

@@ -11,6 +11,7 @@ public interface IAuthorizationService
 {
     Task<IEnumerable<AuthorizationDto>> GetCatalogAsync();
     Task<IEnumerable<StaffAuthorizationDto>> GetStaffAuthorizationsAsync(Guid staffId);
+    Task<IEnumerable<GlobalAuthorizationDto>> GetAllAuthorizationsAsync(string? staffName = null, string? status = null);
     Task<bool> GrantAuthorizationAsync(GrantAuthorizationRequest request);
     Task<bool> DeleteAuthorizationAsync(Guid authorizationId);
 }
@@ -40,6 +41,19 @@ public class AuthorizationService : IAuthorizationService
         {
             var store = await GetLocalStoreAsync();
             return await store.GetStaffAuthorizationsAsync(staffId);
+        }
+    }
+
+    public async Task<IEnumerable<GlobalAuthorizationDto>> GetAllAuthorizationsAsync(string? staffName = null, string? status = null)
+    {
+        try
+        {
+           throw new NotImplementedException();
+        }
+        catch
+        {
+            var store = await GetLocalStoreAsync();
+            return await store.GetAllAuthorizationsAsync(staffName, status);
         }
     }
 

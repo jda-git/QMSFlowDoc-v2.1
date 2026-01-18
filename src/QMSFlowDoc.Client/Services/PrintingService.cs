@@ -296,7 +296,8 @@ public class PrintingService : IPrintingService
                                     cols.ConstantColumn(80); // Date
                                     cols.RelativeColumn();   // Reason
                                     cols.ConstantColumn(80); // Lot
-                                    cols.ConstantColumn(80); // Qty
+                                    cols.ConstantColumn(80); // Expiry
+                                    cols.ConstantColumn(60); // Qty
                                 });
                                 
                                 foreach(var move in group.OrderBy(x => x.MovedAt))
@@ -304,6 +305,8 @@ public class PrintingService : IPrintingService
                                     table.Cell().Padding(2).Text($"{move.MovedAt:dd/MM/yy}");
                                     table.Cell().Padding(2).Text($"{move.Reason} ({move.UserName})");
                                     table.Cell().Padding(2).Text($"Lote: {move.LotNumber}");
+                                    var expiry = move.ExpiryDate.HasValue ? move.ExpiryDate.Value.ToString("MM/yy") : "-";
+                                    table.Cell().Padding(2).Text($"Cad: {expiry}");
                                     table.Cell().Padding(2).AlignRight().Text($"{move.Qty}"); 
                                 }
                             });
@@ -366,9 +369,10 @@ public class PrintingService : IPrintingService
                             {
                                 table.ColumnsDefinition(cols => 
                                 {
-                                    cols.ConstantColumn(150); // Lot
-                                    cols.ConstantColumn(150); // Expiry
-                                    cols.ConstantColumn(150); // Entry Date (MovedAt)
+                                    cols.ConstantColumn(140); // Lot
+                                    cols.ConstantColumn(120); // Expiry
+                                    cols.ConstantColumn(120); // Entry Date
+                                    cols.ConstantColumn(80);  // Units
                                 });
                                 
                                 table.Header(h => 
@@ -376,6 +380,7 @@ public class PrintingService : IPrintingService
                                     h.Cell().Text("Lote").SemiBold().FontSize(9);
                                     h.Cell().Text("Caducidad").SemiBold().FontSize(9);
                                     h.Cell().Text("Fecha Entrada").SemiBold().FontSize(9);
+                                    h.Cell().AlignRight().Text("Unidades").SemiBold().FontSize(9);
                                 });
 
                                 foreach(var move in group.OrderBy(x => x.MovedAt))
@@ -385,6 +390,7 @@ public class PrintingService : IPrintingService
                                     var expiry = move.ExpiryDate.HasValue ? move.ExpiryDate.Value.ToString("MM/yy") : "-";
                                     table.Cell().Text(expiry).FontSize(9);
                                     table.Cell().Text($"{move.MovedAt:dd/MM/yyyy}").FontSize(9);
+                                    table.Cell().AlignRight().Text($"{move.Qty}").FontSize(9);
                                 }
                             });
                             c.Spacing(5);

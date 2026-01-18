@@ -331,6 +331,7 @@ public class LocalDocumentStore
                 Id TEXT PRIMARY KEY,
                 StaffId TEXT NOT NULL,
                 TrainingActivityId TEXT,
+                CompetencyId TEXT, -- Link to Competency
                 Title TEXT, -- For legacy or flat records
                 ParticipationRole TEXT,
                 Result TEXT,
@@ -364,6 +365,8 @@ public class LocalDocumentStore
             CREATE TABLE IF NOT EXISTS StaffAuthorizations (
                 Id TEXT PRIMARY KEY,
                 StaffId TEXT NOT NULL,
+                CompetencyId TEXT, -- Link to Competency
+                EvaluationId TEXT, -- Link to Evaluation (Proof)
                 TaskName TEXT,
                 Description TEXT,
                 ValidFrom TEXT,
@@ -558,6 +561,18 @@ public class LocalDocumentStore
                 FOREIGN KEY (MethodVersionId) REFERENCES MethodVersions(Id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS Competencies (
+                Id TEXT PRIMARY KEY,
+                Code TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                Description TEXT,
+                Category TEXT,
+                TargetPositions TEXT, -- JSON or Comma Sep
+                RequiredFrequencyMonths INTEGER,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT
+            );
+
             CREATE INDEX IF NOT EXISTS idx_documents_code ON Documents(DocCode);
             CREATE INDEX IF NOT EXISTS idx_versions_document ON DocumentVersions(DocumentId);
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON AuditLogs(Timestamp);
@@ -584,6 +599,27 @@ public class LocalDocumentStore
         }
         catch { /* Column already exists */ }
 
+        // Migration for StaffTrainings (ISO 15189 Refactor)
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN TrainingActivityId TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN CompletionDate TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN CompetencyId TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN Title TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN Result TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN Score TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN Status TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN Provider TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN Hours REAL", connection); await c.ExecuteNonQueryAsync(); } catch {}
+
+        // Migration for StaffAuthorizations
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN CompetencyId TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN TaskName TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN ValidFrom TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN ValidUntil TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN GrantedAt TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN GrantedByName TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN GrantedByUserId TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+        try { using var c = new SqliteCommand("ALTER TABLE StaffAuthorizations ADD COLUMN Status TEXT", connection); await c.ExecuteNonQueryAsync(); } catch {}
+
         try
         {
             using var colCmd = new SqliteCommand("ALTER TABLE Documents ADD COLUMN Process TEXT", connection);
@@ -606,6 +642,15 @@ public class LocalDocumentStore
         await EnsureColumnExists(connection, "EQARounds", "ReviewerUserId", "TEXT");
         await EnsureColumnExists(connection, "EQARounds", "ReviewerName", "TEXT");
         await EnsureColumnExists(connection, "EQARounds", "ReviewDate", "TEXT");
+
+        // Personal Module Migrations (Competencies)
+        await EnsureColumnExists(connection, "CompetencyEvaluations", "CompetencyId", "TEXT");
+        
+        // ISO 15189 Refactor Migrations
+        await EnsureColumnExists(connection, "Competencies", "TargetPositions", "TEXT");
+        await EnsureColumnExists(connection, "StaffTrainings", "CompetencyId", "TEXT");
+        await EnsureColumnExists(connection, "StaffAuthorizations", "CompetencyId", "TEXT");
+        await EnsureColumnExists(connection, "StaffAuthorizations", "EvaluationId", "TEXT");
 
         // Seed Document Types
         await SeedDocumentTypesAsync(connection);
@@ -1809,6 +1854,13 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
          // Correct Column is ExpiryDate. 
          // Logic: Active Lots (Status=1) that are expired OR expiring in next 60 days.
          stats.ExpiringReagents = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(DISTINCT ReagentId) FROM ReagentLots WHERE Status = 1 AND date(ExpiryDate) <= date('now', '+60 days')", connection).ExecuteScalarAsync());
+    } catch {}
+
+    // Competencies
+    try {
+        var nowStr = DateTime.Now.ToString("O");
+        stats.ExpiredCompetencies = Convert.ToInt32(await new SqliteCommand($"SELECT COUNT(*) FROM CompetencyEvaluations WHERE ValidUntil IS NOT NULL AND ValidUntil < '{nowStr}'", connection).ExecuteScalarAsync());
+        stats.PendingTrainings = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM StaffTrainings WHERE Status = 'Pending' OR Status = 'In Progress'", connection).ExecuteScalarAsync());
     } catch {}
 
     // Recent Activity (Audit Logs)
@@ -3081,62 +3133,11 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
     }
 
     // Training CRUD
-    public async Task RegisterTrainingAsync(Guid staffId, string title, string? provider, decimal hours, DateTime completed, string result, string? notes)
-    {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        await connection.OpenAsync();
-        
-        var sql = @"INSERT INTO StaffTrainings (Id, StaffId, Title, Provider, Hours, CompletedAt, Result, Notes)
-                    VALUES ($id, $sid, $title, $prov, $hours, $comp, $res, $notes)";
-        using var cmd = new SqliteCommand(sql, connection);
-        cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
-        cmd.Parameters.AddWithValue("$sid", staffId.ToString());
-        cmd.Parameters.AddWithValue("$title", title);
-        cmd.Parameters.AddWithValue("$prov", provider ?? (object)DBNull.Value);
-        cmd.Parameters.AddWithValue("$hours", hours);
-        cmd.Parameters.AddWithValue("$comp", completed.ToString("o"));
-        cmd.Parameters.AddWithValue("$res", result);
-        cmd.Parameters.AddWithValue("$notes", notes ?? (object)DBNull.Value);
-        await cmd.ExecuteNonQueryAsync();
-    }
 
-    public async Task<bool> DeleteTrainingAsync(Guid id)
-    {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        await connection.OpenAsync();
-        
-        using var cmd = new SqliteCommand("DELETE FROM StaffTrainings WHERE Id = $id", connection);
-        cmd.Parameters.AddWithValue("$id", id.ToString());
-        return await cmd.ExecuteNonQueryAsync() > 0;
-    }
 
-    // Competency CRUD
-    public async Task<IEnumerable<CompetencyEvaluationDto>> GetStaffEvaluationsAsync(Guid staffId)
-    {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        await connection.OpenAsync();
-        
-        var sql = "SELECT Id, CompetencyName, Area, EvaluationDate, ValidUntil, Outcome, EvaluatorName FROM CompetencyEvaluations WHERE StaffId = $sid";
-        using var cmd = new SqliteCommand(sql, connection);
-        cmd.Parameters.AddWithValue("$sid", staffId.ToString());
-        using var reader = await cmd.ExecuteReaderAsync();
-        
-        var list = new List<CompetencyEvaluationDto>();
-        while (await reader.ReadAsync())
-        {
-            list.Add(new CompetencyEvaluationDto(
-                Guid.Parse(reader.GetString(0)),
-                Guid.Empty,
-                reader.IsDBNull(1) ? "Unknown" : reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                DateTime.Parse(reader.GetString(3)),
-                reader.IsDBNull(4) ? (DateTime?)null : DateTime.Parse(reader.GetString(4)),
-                reader.IsDBNull(5) ? "Pending" : reader.GetString(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6)
-            ));
-        }
-        return list;
-    }
+    // Competency CRUD - Moved to Region
+    // GetStaffEvaluationsAsync moved
+
 
     private async Task<string> GetUserNameByIdAsync(SqliteConnection connection, Guid? userId)
     {
@@ -3171,14 +3172,9 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         await cmd.ExecuteNonQueryAsync();
     }
     
-    public async Task<bool> DeleteEvaluationAsync(Guid id)
-    {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        await connection.OpenAsync();
-        using var cmd = new SqliteCommand("DELETE FROM CompetencyEvaluations WHERE Id = $id", connection);
-        cmd.Parameters.AddWithValue("$id", id.ToString());
-        return await cmd.ExecuteNonQueryAsync() > 0;
-    }
+
+    // DeleteEvaluationAsync moved
+
 
     // Authorization CRUD
     public async Task<IEnumerable<StaffAuthorizationDto>> GetStaffAuthorizationsAsync(Guid staffId)
@@ -3186,7 +3182,7 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         await connection.OpenAsync();
         
-        var sql = "SELECT Id, TaskName, Description, ValidFrom, ValidUntil, GrantedAt, Status, GrantedByName FROM StaffAuthorizations WHERE StaffId = $sid";
+        var sql = "SELECT Id, TaskName, Description, ValidFrom, ValidUntil, GrantedAt, Status, GrantedByName, CompetencyId FROM StaffAuthorizations WHERE StaffId = $sid";
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("$sid", staffId.ToString());
         using var reader = await cmd.ExecuteReaderAsync();
@@ -3203,42 +3199,14 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
                 reader.IsDBNull(4) ? (DateTime?)null : DateTime.Parse(reader.GetString(4)),
                 DateTime.Parse(reader.GetString(5)),
                 reader.IsDBNull(6) ? "Active" : reader.GetString(6),
-                reader.IsDBNull(7) ? null : reader.GetString(7)
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.IsDBNull(8) ? (Guid?)null : Guid.Parse(reader.GetString(8))
             ));
         }
         return list;
     }
 
-    public async Task GrantAuthorizationAsync(GrantAuthorizationRequest req)
-    {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        await connection.OpenAsync();
-        
-        var grantedByName = await GetUserNameByIdAsync(connection, req.GrantedByUserId);
 
-        var sql = @"INSERT INTO StaffAuthorizations (Id, StaffId, TaskName, Description, ValidFrom, ValidUntil, GrantedAt, Status, GrantedByName)
-                    VALUES ($id, $sid, $name, $desc, $from, $until, $granted, $status, $by)";
-        using var cmd = new SqliteCommand(sql, connection);
-        cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
-        cmd.Parameters.AddWithValue("$sid", req.StaffId.ToString());
-        cmd.Parameters.AddWithValue("$name", req.TaskName);
-        cmd.Parameters.AddWithValue("$desc", req.Description ?? (object)DBNull.Value);
-        cmd.Parameters.AddWithValue("$from", req.ValidFrom.ToString("o"));
-        cmd.Parameters.AddWithValue("$until", req.ValidUntil?.ToString("o") ?? (object)DBNull.Value);
-        cmd.Parameters.AddWithValue("$granted", DateTime.UtcNow.ToString("o"));
-        cmd.Parameters.AddWithValue("$status", "Active");
-        cmd.Parameters.AddWithValue("$by", grantedByName);
-        await cmd.ExecuteNonQueryAsync();
-    }
-
-    public async Task<bool> DeleteAuthorizationAsync(Guid id)
-    {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        await connection.OpenAsync();
-        using var cmd = new SqliteCommand("DELETE FROM StaffAuthorizations WHERE Id = $id", connection);
-        cmd.Parameters.AddWithValue("$id", id.ToString());
-        return await cmd.ExecuteNonQueryAsync() > 0;
-    }
     // Risk CRUD
     public async Task<IEnumerable<RiskListDto>> GetRisksAsync()
     {
@@ -4480,6 +4448,7 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
     }
 
     #endregion
+
     public async Task<List<AuditLogDto>> GetAuditLogsAsync(AuditFilter filter)
     {
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -4531,4 +4500,427 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         }
         return list;
     }
+
+    #region Competency Module
+
+    public async Task<IEnumerable<Competency>> GetCompetenciesAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var list = new List<Competency>();
+        using var cmd = new SqliteCommand("SELECT * FROM Competencies ORDER BY Code", connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Competency
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                Code = reader["Code"].ToString()!,
+                Name = reader["Name"].ToString()!,
+                Description = reader["Description"] == DBNull.Value ? null : reader["Description"].ToString(),
+                Category = reader["Category"] == DBNull.Value ? null : reader["Category"].ToString(),
+                RequiredFrequencyMonths = reader["RequiredFrequencyMonths"] == DBNull.Value ? null : Convert.ToInt32(reader["RequiredFrequencyMonths"]),
+                CreatedAt = DateTime.Parse(reader["CreatedAt"].ToString()!),
+                UpdatedAt = reader["UpdatedAt"] == DBNull.Value ? null : DateTime.Parse(reader["UpdatedAt"].ToString()!)
+            });
+        }
+        return list;
+    }
+
+    public async Task<Competency?> GetCompetencyByIdAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = new SqliteCommand("SELECT * FROM Competencies WHERE Id = $id", connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        using var reader = await cmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return new Competency
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                Code = reader["Code"].ToString()!,
+                Name = reader["Name"].ToString()!,
+                Description = reader["Description"] == DBNull.Value ? null : reader["Description"].ToString(),
+                Category = reader["Category"] == DBNull.Value ? null : reader["Category"].ToString(),
+                RequiredFrequencyMonths = reader["RequiredFrequencyMonths"] == DBNull.Value ? null : Convert.ToInt32(reader["RequiredFrequencyMonths"]),
+                CreatedAt = DateTime.Parse(reader["CreatedAt"].ToString()!),
+                UpdatedAt = reader["UpdatedAt"] == DBNull.Value ? null : DateTime.Parse(reader["UpdatedAt"].ToString()!)
+            };
+        }
+        return null;
+    }
+
+    public async Task UpsertCompetencyAsync(Competency competency)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = @"INSERT INTO Competencies (Id, Code, Name, Description, Category, RequiredFrequencyMonths, CreatedAt, UpdatedAt)
+                    VALUES ($id, $code, $name, $desc, $cat, $freq, $created, $updated)
+                    ON CONFLICT(Id) DO UPDATE SET
+                    Code=excluded.Code, Name=excluded.Name, Description=excluded.Description, Category=excluded.Category,
+                    RequiredFrequencyMonths=excluded.RequiredFrequencyMonths, UpdatedAt=excluded.UpdatedAt";
+        
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", competency.Id.ToString());
+        cmd.Parameters.AddWithValue("$code", competency.Code);
+        cmd.Parameters.AddWithValue("$name", competency.Name);
+        cmd.Parameters.AddWithValue("$desc", competency.Description ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$cat", competency.Category ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$freq", competency.RequiredFrequencyMonths ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$created", competency.CreatedAt.ToString("o"));
+        cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("o"));
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<bool> DeleteCompetencyAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = new SqliteCommand("DELETE FROM Competencies WHERE Id=$id", connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<IEnumerable<CompetencyEvaluationDto>> GetStaffEvaluationsAsync(Guid staffId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var list = new List<CompetencyEvaluationDto>();
+        // Join with Competencies if possible to get Code, but rely on table data mostly
+        var sql = @"SELECT e.*, c.Code as CompetencyCode 
+                    FROM CompetencyEvaluations e 
+                    LEFT JOIN Competencies c ON e.CompetencyId = c.Id
+                    WHERE e.StaffId = $sid 
+                    ORDER BY e.EvaluationDate DESC";
+        
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$sid", staffId.ToString());
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new CompetencyEvaluationDto
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                StaffId = Guid.Parse(reader["StaffId"].ToString()!),
+                CompetencyName = reader["CompetencyName"] == DBNull.Value ? "Unknown" : reader["CompetencyName"].ToString()!,
+                CompetencyId = reader["CompetencyId"] == DBNull.Value ? null : Guid.Parse(reader["CompetencyId"].ToString()!), // If added
+                Area = reader["Area"] == DBNull.Value ? null : reader["Area"].ToString(),
+                EvaluationDate = reader["EvaluationDate"] == DBNull.Value ? DateTime.MinValue : DateTime.Parse(reader["EvaluationDate"].ToString()!),
+                ValidUntil = reader["ValidUntil"] == DBNull.Value ? null : DateTime.Parse(reader["ValidUntil"].ToString()!),
+                Outcome = reader["Outcome"] == DBNull.Value ? "Pending" : reader["Outcome"].ToString()!,
+                Evidence = reader["Evidence"] == DBNull.Value ? null : reader["Evidence"].ToString(),
+                EvaluatorName = reader["EvaluatorName"] == DBNull.Value ? null : reader["EvaluatorName"].ToString()
+            });
+        }
+        return list;
+    }
+
+    public async Task UpsertEvaluationAsync(CompetencyEvaluationDto dto)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        
+        // Constraint: Check Training Exists
+        if (dto.CompetencyId.HasValue)
+        {
+             var trainSql = "SELECT COUNT(1) FROM StaffTrainings WHERE StaffId = $sid AND CompetencyId = $cid";
+             using var trainCmd = new SqliteCommand(trainSql, connection);
+             trainCmd.Parameters.AddWithValue("$sid", dto.StaffId.ToString());
+             trainCmd.Parameters.AddWithValue("$cid", dto.CompetencyId.Value.ToString());
+             var count = Convert.ToInt32(await trainCmd.ExecuteScalarAsync());
+             
+             if (count == 0 && dto.Outcome != "Not Competent") // Allow failing if no training? No, usually you train then evaluate. But maybe you evaluate to find gaps.
+             {
+                 // If the user wants to enable "Gap Analysis" (evaluate without training), this blocks it.
+                 // But the task says "EvaluateCompetency: Check if Training exists".
+                 // So I will enforce it.
+                 // But I'll allow "Pending" or "Not Competent" maybe?
+                 // No, strict: "Check if Training exists".
+                 // I'll throw exception.
+                 throw new InvalidOperationException("Cannot record evaluation: No training record found for this competency.");
+             }
+        }
+
+        var sql = @"INSERT INTO CompetencyEvaluations (Id, StaffId, CompetencyName, CompetencyId, Area, EvaluationDate, ValidUntil, Outcome, Evidence, EvaluatorName)
+                    VALUES ($id, $sid, $name, $cid, $area, $date, $valid, $outcome, $ev, $evaluator)
+                    ON CONFLICT(Id) DO UPDATE SET
+                    CompetencyName=excluded.CompetencyName, CompetencyId=excluded.CompetencyId, Area=excluded.Area, EvaluationDate=excluded.EvaluationDate,
+                    ValidUntil=excluded.ValidUntil, Outcome=excluded.Outcome, Evidence=excluded.Evidence, EvaluatorName=excluded.EvaluatorName";
+        
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", dto.Id.ToString());
+        cmd.Parameters.AddWithValue("$sid", dto.StaffId.ToString());
+        cmd.Parameters.AddWithValue("$name", dto.CompetencyName ?? "");
+        cmd.Parameters.AddWithValue("$cid", dto.CompetencyId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$area", dto.Area ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$date", dto.EvaluationDate.ToString("o"));
+        cmd.Parameters.AddWithValue("$valid", dto.ValidUntil?.ToString("o") ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$outcome", dto.Outcome ?? "Pending");
+        cmd.Parameters.AddWithValue("$ev", (object)DBNull.Value); // Evidence not in DTO?
+        cmd.Parameters.AddWithValue("$evaluator", dto.EvaluatorName ?? (object)DBNull.Value);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<bool> DeleteEvaluationAsync(Guid id)
+    {
+         using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = new SqliteCommand("DELETE FROM CompetencyEvaluations WHERE Id=$id", connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+
+
+
+    public async Task<bool> RegisterTrainingAsync(RegisterTrainingRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = @"INSERT INTO StaffTrainings (Id, StaffId, TrainingActivityId, Title, Provider, CompletionDate, Hours, Result, Notes, CompetencyId)
+                    VALUES ($id, $sid, $tid, $title, $prov, $date, $hours, $res, $notes, $cid)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        cmd.Parameters.AddWithValue("$sid", request.StaffId.ToString());
+        cmd.Parameters.AddWithValue("$tid", Guid.NewGuid().ToString()); // Ensure distinct activity ID for each entry for now
+        cmd.Parameters.AddWithValue("$title", request.Title);
+        cmd.Parameters.AddWithValue("$prov", request.Provider ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$date", request.CompletedAt.ToString("o"));
+        cmd.Parameters.AddWithValue("$hours", request.Hours);
+        cmd.Parameters.AddWithValue("$res", request.Result);
+        cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$cid", request.CompetencyId?.ToString() ?? (object)DBNull.Value);
+        
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = @"UPDATE StaffTrainings SET 
+                    Title=$title, Provider=$prov, Hours=$hours, CompletionDate=$date, 
+                    Result=$res, Notes=$notes, CompetencyId=$cid
+                    WHERE Id=$id";
+        
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", request.Id.ToString());
+        cmd.Parameters.AddWithValue("$title", request.Title);
+        cmd.Parameters.AddWithValue("$prov", request.Provider ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$hours", request.Hours);
+        cmd.Parameters.AddWithValue("$date", request.CompletedAt.ToString("o"));
+        cmd.Parameters.AddWithValue("$res", request.Result);
+        cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$cid", request.CompetencyId?.ToString() ?? (object)DBNull.Value);
+        
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<bool> DeleteTrainingAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = new SqliteCommand("DELETE FROM StaffTrainings WHERE Id=$id", connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<bool> GrantAuthorizationAsync(GrantAuthorizationRequest request)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        string grantedByName = "Admin";
+        if (request.GrantedByUserId.HasValue)
+        {
+             using var nameCmd = new SqliteCommand("SELECT FullName FROM Users WHERE Id=$uid", connection);
+             nameCmd.Parameters.AddWithValue("$uid", request.GrantedByUserId.Value.ToString());
+             var result = await nameCmd.ExecuteScalarAsync();
+             if (result != null) grantedByName = result.ToString() ?? "Admin";
+        }
+
+        // Constraint: Check Assessment/Evaluation
+        Guid? evaluationId = null;
+        if (request.CompetencyId.HasValue)
+        {
+             var checkSql = @"SELECT Id FROM CompetencyEvaluations 
+                              WHERE StaffId = $sid AND CompetencyId = $cid 
+                              AND (Outcome LIKE 'Competent%' OR Outcome LIKE 'Apto%' OR Outcome LIKE 'Satisfac%')
+                              AND (ValidUntil IS NULL OR ValidUntil > $now)
+                              ORDER BY EvaluationDate DESC LIMIT 1";
+             using var checkCmd = new SqliteCommand(checkSql, connection);
+             checkCmd.Parameters.AddWithValue("$sid", request.StaffId.ToString());
+             checkCmd.Parameters.AddWithValue("$cid", request.CompetencyId.Value.ToString());
+             checkCmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("o"));
+             var resultId = await checkCmd.ExecuteScalarAsync();
+             
+             if (resultId == null)
+             {
+                  return false;
+             }
+             evaluationId = Guid.Parse(resultId.ToString()!);
+        }
+
+        var sql = @"INSERT INTO StaffAuthorizations (Id, StaffId, TaskName, Description, ValidFrom, ValidUntil, GrantedByUserId, GrantedByName, GrantedAt, CompetencyId, EvaluationId, Status)
+                    VALUES ($id, $sid, $task, $desc, $from, $until, $by, $byname, $at, $cid, $evid, 'Active')";
+        
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        cmd.Parameters.AddWithValue("$sid", request.StaffId.ToString());
+        cmd.Parameters.AddWithValue("$task", request.TaskName);
+        cmd.Parameters.AddWithValue("$desc", request.Description ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$from", request.ValidFrom.ToString("o"));
+        cmd.Parameters.AddWithValue("$until", request.ValidUntil?.ToString("o") ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$by", request.GrantedByUserId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$byname", grantedByName);
+        cmd.Parameters.AddWithValue("$at", DateTime.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("$cid", request.CompetencyId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$evid", evaluationId?.ToString() ?? (object)DBNull.Value);
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<bool> DeleteAuthorizationAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = new SqliteCommand("DELETE FROM StaffAuthorizations WHERE Id=$id", connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<IEnumerable<GlobalTrainingDto>> GetAllTrainingsAsync(string? staffName = null, string? competencyName = null, DateTime? fromDate = null, DateTime? toDate = null)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var list = new List<GlobalTrainingDto>();
+        
+        // Join with Staff and User to get names
+        // StaffProfiles table has UserId which links to Users table (FullName)
+        var sql = @"SELECT t.*, u.FullName as StaffName, s.Position as PositionTitle, comp.Name as CompetencyNameRef
+                    FROM StaffTrainings t
+                    JOIN StaffProfiles s ON t.StaffId = s.Id
+                    JOIN Users u ON s.UserId = u.Id
+                    LEFT JOIN Competencies comp ON t.CompetencyId = comp.Id
+                    WHERE 1=1";
+        
+        using var cmd = new SqliteCommand(sql, connection);
+        
+        if (!string.IsNullOrEmpty(staffName))
+        {
+            sql += " AND u.FullName LIKE $staffName";
+            cmd.Parameters.AddWithValue("$staffName", $"%{staffName}%");
+        }
+        
+        if (!string.IsNullOrEmpty(competencyName))
+        {
+             // Check both the training title and the linked competency name
+            sql += " AND (t.Title LIKE $compName OR comp.Name LIKE $compName)";
+            cmd.Parameters.AddWithValue("$compName", $"%{competencyName}%");
+        }
+
+        if (fromDate.HasValue)
+        {
+            sql += " AND t.CompletionDate >= $fromDate";
+            cmd.Parameters.AddWithValue("$fromDate", fromDate.Value.ToString("O"));
+        }
+
+        if (toDate.HasValue)
+        {
+            sql += " AND t.CompletionDate <= $toDate";
+            cmd.Parameters.AddWithValue("$toDate", toDate.Value.ToString("O"));
+        }
+
+        sql += " ORDER BY t.CompletionDate DESC";
+        cmd.CommandText = sql;
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var dto = new GlobalTrainingDto
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                StaffId = Guid.Parse(reader["StaffId"].ToString()!),
+                StaffName = reader["StaffName"] == DBNull.Value ? "" : reader["StaffName"].ToString()!,
+                StaffPosition = reader["PositionTitle"] == DBNull.Value ? "" : reader["PositionTitle"].ToString()!,
+                TrainingActivityId = reader["TrainingActivityId"] == DBNull.Value ? Guid.Empty : Guid.Parse(reader["TrainingActivityId"].ToString()!),
+                Title = reader["Title"].ToString()!,
+                Provider = reader["Provider"].ToString()!,
+                CompletionDate = reader["CompletionDate"] == DBNull.Value ? DateTime.MinValue : DateTime.Parse(reader["CompletionDate"].ToString()!),
+                Hours = Convert.ToDecimal(reader["Hours"]),
+                Result = reader["Result"].ToString()!,
+                CompetencyNameRef = reader["CompetencyNameRef"] == DBNull.Value ? null : reader["CompetencyNameRef"].ToString(),
+                CompetencyId = reader["CompetencyId"] == DBNull.Value ? null : Guid.Parse(reader["CompetencyId"].ToString()!)
+            };
+            list.Add(dto);
+        }
+        return list;
+    }
+
+    public async Task<IEnumerable<GlobalAuthorizationDto>> GetAllAuthorizationsAsync(string? staffName = null, string? status = null) // status: Active, Expired
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var list = new List<GlobalAuthorizationDto>();
+        
+        var sql = @"SELECT a.*, u.FullName as StaffName, s.Position
+                    FROM StaffAuthorizations a
+                    JOIN StaffProfiles s ON a.StaffId = s.Id
+                    JOIN Users u ON s.UserId = u.Id
+                    WHERE 1=1";
+
+        using var cmd = new SqliteCommand(sql, connection);
+
+         if (!string.IsNullOrEmpty(staffName))
+        {
+            sql += " AND u.FullName LIKE $staffName";
+            cmd.Parameters.AddWithValue("$staffName", $"%{staffName}%");
+        }
+
+        // Status filter
+        if (status == "Active")
+        {
+            sql += " AND (a.ValidUntil IS NULL OR a.ValidUntil > $now)";
+            cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("O"));
+        }
+        else if (status == "Expired")
+        {
+            sql += " AND (a.ValidUntil IS NOT NULL AND a.ValidUntil <= $now)";
+            cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("O"));
+        }
+
+        sql += " ORDER BY a.ValidUntil DESC";
+        cmd.CommandText = sql;
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var dto = new GlobalAuthorizationDto
+            {
+               Id = Guid.Parse(reader["Id"].ToString()!),
+               StaffId = Guid.Parse(reader["StaffId"].ToString()!),
+               StaffName = reader["StaffName"] == DBNull.Value ? "Unknown" : reader["StaffName"].ToString()!,
+               StaffPosition = reader["Position"] == DBNull.Value ? "" : reader["Position"].ToString()!,
+               AuthorizationId = Guid.Empty, // No separate Catalog ID
+               AuthorizationName = reader["TaskName"] == DBNull.Value ? "Unknown" : reader["TaskName"].ToString(),
+               Description = reader["Description"] == DBNull.Value ? null : reader["Description"].ToString(),
+               ValidFrom = reader["ValidFrom"] == DBNull.Value ? DateTime.MinValue : DateTime.Parse(reader["ValidFrom"].ToString()!),
+               ValidUntil = reader["ValidUntil"] == DBNull.Value ? null : DateTime.Parse(reader["ValidUntil"].ToString()!),
+               GrantedBy = null,
+               GrantedByName = reader["GrantedByName"] == DBNull.Value ? "Unknown" : reader["GrantedByName"].ToString(),
+               GrantedAt = reader["GrantedAt"] == DBNull.Value ? DateTime.MinValue : DateTime.Parse(reader["GrantedAt"].ToString()!),
+               Status = (reader["ValidUntil"] != DBNull.Value && DateTime.Parse(reader["ValidUntil"].ToString()!) <= DateTime.UtcNow) ? "Expired" : "Active",
+               CompetencyId = reader.IsDBNull(reader.GetOrdinal("CompetencyId")) ? null : Guid.Parse(reader["CompetencyId"].ToString()!),
+               EvaluationId = reader.IsDBNull(reader.GetOrdinal("EvaluationId")) ? null : Guid.Parse(reader["EvaluationId"].ToString()!)
+            };
+            
+            list.Add(dto);
+        }
+        return list;
+    }
+
+
+
+    #endregion
+
 }

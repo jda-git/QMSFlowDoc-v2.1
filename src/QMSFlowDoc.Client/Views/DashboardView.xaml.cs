@@ -95,6 +95,12 @@ public sealed partial class DashboardView : Page, INotifyPropertyChanged
         if (stats.OpenHighRisks > 0)
             alerts.Add(new DashboardAlert("Riesgos", $"{stats.OpenHighRisks} riesgos críticos abiertos"));
 
+        if (stats.ExpiredCompetencies > 0)
+            alerts.Add(new DashboardAlert("Competencias", $"{stats.ExpiredCompetencies} competencias caducadas"));
+        
+        if (stats.PendingTrainings > 0)
+            alerts.Add(new DashboardAlert("Formación", $"{stats.PendingTrainings} actividades de formación pendientes"));
+
         AlertsList.ItemsSource = alerts;
         NoAlertsText.Visibility = alerts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         AlertsList.Visibility = alerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
