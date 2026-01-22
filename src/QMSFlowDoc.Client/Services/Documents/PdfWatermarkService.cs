@@ -116,7 +116,15 @@ public class PdfWatermarkService
             }
 
             // Bloquear impresión para forzar uso de botón imprimir del software
-            document.SecuritySettings.PermitPrint = false;
+            // Se requiere OwnerPassword para que Acrobat active la seguridad
+            var security = document.SecuritySettings;
+            security.OwnerPassword = Guid.NewGuid().ToString(); 
+            security.PermitPrint = false;
+            security.PermitFullQualityPrint = false;
+            security.PermitModifyDocument = false;
+            security.PermitExtractContent = false;
+            security.PermitAnnotations = false;
+            security.PermitAnnotations = false;
             
             document.Save(outputStream, false);
             return outputStream.ToArray();

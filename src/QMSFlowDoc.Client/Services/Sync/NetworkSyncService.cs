@@ -22,7 +22,15 @@ public class SyncChange
     public SyncDirection Direction { get; set; }
     public bool IsConflict { get; set; }
     public SyncDirection ConflictResolution { get; set; } = SyncDirection.None;
+    public bool IsNewerButSmaller { get; set; } // Flag for potential data loss
+
+    public string LocalSizeFormatted => FormatSize(LocalSize);
+    public string NetworkSizeFormatted => FormatSize(NetworkSize);
     
+    public string WarningMessage => IsNewerButSmaller 
+        ? "⚠️ ¡PELIGRO! Versión local VACÍA o MENOR. Se recomienda 'Usar Red'." 
+        : "";
+
     public string DirectionText => Direction switch
     {
         SyncDirection.Download => "📥 Descargar (Red → Local)",
@@ -30,6 +38,13 @@ public class SyncChange
         SyncDirection.Conflict => "⚠️ Conflicto",
         _ => "Sin cambios"
     };
+
+    private string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / 1024 / 1024.0:F1} MB";
+    }
 }
 
 public enum SyncDirection
@@ -168,15 +183,34 @@ public class NetworkSyncService
                     }
                     else if (localMod > networkMod)
                     {
-                        changes.Add(new SyncChange
+                        // Local is newer. Check for "Newer but Smaller" (potential fresh overwrite)
+                        if (localInfo.Length < networkInfo.Length && networkInfo.Length > 0)
                         {
-                            RelativePath = relativePath,
-                            LocalModified = localMod,
-                            NetworkModified = networkMod,
-                            LocalSize = localInfo.Length,
-                            NetworkSize = networkInfo.Length,
-                            Direction = SyncDirection.Upload
-                        });
+                            changes.Add(new SyncChange
+                            {
+                                RelativePath = relativePath,
+                                LocalModified = localMod,
+                                NetworkModified = networkMod,
+                                LocalSize = localInfo.Length,
+                                NetworkSize = networkInfo.Length,
+                                Direction = SyncDirection.Conflict, // Force user decision
+                                IsConflict = true,
+                                IsNewerButSmaller = true,
+                                ConflictResolution = SyncDirection.Download // Default to keeping Network (Master)
+                            });
+                        }
+                        else
+                        {
+                            changes.Add(new SyncChange
+                            {
+                                RelativePath = relativePath,
+                                LocalModified = localMod,
+                                NetworkModified = networkMod,
+                                LocalSize = localInfo.Length,
+                                NetworkSize = networkInfo.Length,
+                                Direction = SyncDirection.Upload
+                            });
+                        }
                     }
                     else
                     {

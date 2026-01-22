@@ -95,11 +95,23 @@
                                 <TextBlock Text="{Binding RelativePath}" 
                                            TextTrimming="CharacterEllipsis"
                                            FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding WarningMessage}" 
+                                           Foreground="Red" 
+                                           FontWeight="Bold" 
+                                           FontSize="11" 
+                                           Margin="0,2,0,2"/>
                                 <StackPanel Orientation="Horizontal" Opacity="0.6">
                                     <TextBlock Text="Local: " FontSize="11"/>
                                     <TextBlock Text="{Binding LocalModified}" FontSize="11"/>
+                                    <TextBlock Text=" (" FontSize="11"/>
+                                    <TextBlock Text="{Binding LocalSizeFormatted}" FontSize="11"/>
+                                    <TextBlock Text=")" FontSize="11"/>
+
                                     <TextBlock Text=" | Red: " FontSize="11"/>
                                     <TextBlock Text="{Binding NetworkModified}" FontSize="11"/>
+                                    <TextBlock Text=" (" FontSize="11"/>
+                                    <TextBlock Text="{Binding NetworkSizeFormatted}" FontSize="11"/>
+                                    <TextBlock Text=")" FontSize="11"/>
                                 </StackPanel>
                             </StackPanel>
                             <Button Grid.Column="1" 
