@@ -323,10 +323,46 @@ public class DocumentService : IDocumentService
             var doc = await store.GetDocumentByIdAsync(id);
             var version = doc?.Versions?.OrderByDescending(v => v.CreatedAt).FirstOrDefault();
             
-            if (version?.LocalFilePath != null && System.IO.File.Exists(version.LocalFilePath))
+            if (version?.LocalFilePath != null)
             {
-                await LogAsync("ACCESS", "Document", id, $"Archivo accedido localmente: {version.FileName}");
-                return await System.IO.File.ReadAllBytesAsync(version.LocalFilePath);
+                var path = version.LocalFilePath;
+                
+                // 1. Direct Access (Absolute Path is valid)
+                if (System.IO.File.Exists(path))
+                {
+                    await LogAsync("ACCESS", "Document", id, $"Archivo accedido localmente: {version.FileName}");
+                    return await System.IO.File.ReadAllBytesAsync(path);
+                }
+
+                // 2. Dynamic Resolution (Portable Mode)
+                // If absolute path doesn't exist (e.g. moved PC), try to resolve relative to current Workspace
+                try 
+                {
+                    var config = await _networkConfig.LoadAsync();
+                    if (config != null && !string.IsNullOrEmpty(config.LocalBasePath))
+                    {
+                        // Strategy A: Check if path contains "Documentos" (standard structure)
+                        var idx = path.IndexOf("Documentos", StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
+                        {
+                            var relative = path.Substring(idx); // Documentos\Subfolder\File.pdf
+                            // Clean leading separators if any
+                            if (relative.StartsWith(Path.DirectorySeparatorChar) || relative.StartsWith(Path.AltDirectorySeparatorChar))
+                                relative = relative.Substring(1);
+
+                            var newPath = Path.Combine(config.LocalBasePath, relative);
+                            if (System.IO.File.Exists(newPath))
+                            {
+                                await LogAsync("ACCESS", "Document", id, $"Archivo recuperado dinámicamente: {version.FileName}");
+                                return await System.IO.File.ReadAllBytesAsync(newPath);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error resolving path dynamic: {ex.Message}");
+                }
             }
             return null;
         }
