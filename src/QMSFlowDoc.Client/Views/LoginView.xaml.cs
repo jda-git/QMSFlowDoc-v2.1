@@ -28,6 +28,11 @@ public sealed partial class LoginView : Page
         {
             var needsBootstrap = await _authService.NeedsBootstrapAsync();
             BootstrapButton.Visibility = needsBootstrap ? Visibility.Visible : Visibility.Collapsed;
+            ConfirmPasswordBox.Visibility = needsBootstrap ? Visibility.Visible : Visibility.Collapsed;
+            BootstrapInfo.Visibility = needsBootstrap ? Visibility.Visible : Visibility.Collapsed;
+            
+            // In bootstrap mode, hide the login button to avoid confusion
+            LoginButton.Visibility = needsBootstrap ? Visibility.Collapsed : Visibility.Visible;
         }
         catch { }
     }
@@ -73,6 +78,20 @@ public sealed partial class LoginView : Page
             return;
         }
 
+        if (PasswordBox.Password.Length < 8)
+        {
+            ErrorText.Text = "La contraseña debe tener al menos 8 caracteres.";
+            ErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        if (PasswordBox.Password != ConfirmPasswordBox.Password)
+        {
+            ErrorText.Text = "Las contraseñas no coinciden.";
+            ErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+
         ErrorText.Visibility = Visibility.Collapsed;
         LoginProgress.IsActive = true;
         BootstrapButton.IsEnabled = false;
@@ -110,6 +129,16 @@ public sealed partial class LoginView : Page
         {
             LoginProgress.IsActive = false;
             BootstrapButton.IsEnabled = true;
+        }
+    }
+    private void OnInputKeyUp(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Enter)
+        {
+            if (LoginButton.Visibility == Visibility.Visible && LoginButton.IsEnabled)
+            {
+                LoginButton_Click(sender, e);
+            }
         }
     }
 }

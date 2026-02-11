@@ -15,6 +15,9 @@
             <local:NullableDateConverter x:Key="NullableDateConverter" />
             <local:NullToVisibilityConverter x:Key="NullVisibilityConverter" />
             <local:StatusBackgroundConverter x:Key="StatusBackgroundConverter" />
+            <local:RiskScoreColorConverter x:Key="RiskScoreColorConverter" />
+            <local:DateFormatConverter x:Key="DateFormatConverter" />
+            <local:BoolToColorConverter x:Key="BoolToColorConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

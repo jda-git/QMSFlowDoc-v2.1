@@ -1,0 +1,69 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.SupplierEditorView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid Padding="24" RowDefinitions="Auto, *, Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,20">
+            <Button Click="Back_Click">
+                <FontIcon Glyph="&#xE72B;" />
+            </Button>
+            <TextBlock x:Name="PageTitle" Text="Nuevo Proveedor" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1">
+            <Pivot>
+                <!-- Tab 1: General Info -->
+                <PivotItem Header="Datos Generales">
+                    <StackPanel Spacing="16" Padding="0,16">
+                        <TextBox x:Name="NameBox" Header="Nombre *" PlaceholderText="Nombre del proveedor" />
+                        <ComboBox x:Name="TypeCombo" Header="Tipo de Proveedor" Width="300">
+                            <ComboBoxItem Content="Suministros / Reactivos" IsSelected="True" />
+                            <ComboBoxItem Content="Servicio Técnico" />
+                            <ComboBoxItem Content="Laboratorio de Derivación" />
+                        </ComboBox>
+                        <TextBox x:Name="ContactBox" Header="Persona de Contacto" PlaceholderText="Nombre del contacto" />
+                        <TextBox x:Name="EmailBox" Header="Email" PlaceholderText="correo@ejemplo.com" />
+                        <TextBox x:Name="PhoneBox" Header="Teléfono" PlaceholderText="+34 XXX XXX XXX" />
+                        <TextBox x:Name="AddressBox" Header="Dirección" PlaceholderText="Calle, Ciudad, CP" />
+                        <TextBox x:Name="NotesBox" Header="Notas" PlaceholderText="Observaciones adicionales..." TextWrapping="Wrap" AcceptsReturn="True" Height="100" />
+                    </StackPanel>
+                </PivotItem>
+
+                <!-- Tab 2: Evaluation History -->
+                <PivotItem Header="Histórico de Evaluaciones">
+                    <Grid RowDefinitions="Auto, *">
+                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,12">
+                            <Button Content="Nueva Evaluación" Style="{StaticResource AccentButtonStyle}" Click="NewEvaluation_Click" />
+                            <TextBlock x:Name="StatusBadge" VerticalAlignment="Center" FontWeight="Bold" />
+                        </StackPanel>
+                        
+                        <ListView x:Name="EvaluationsList" Grid.Row="1">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="8" ColumnDefinitions="120,*,80,80">
+                                        <TextBlock Text="{Binding EvaluationDate, Converter={StaticResource DateFormatConverter}}" Grid.Column="0" />
+                                        <TextBlock Text="{Binding EvaluatedPeriod}" Grid.Column="1" />
+                                        <TextBlock Text="{Binding AverageScore}" Grid.Column="2" FontWeight="Bold" />
+                                        <TextBlock Text="{Binding IsApproved}" Grid.Column="3" 
+                                                   Foreground="{Binding IsApproved, Converter={StaticResource BoolToColorConverter}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </PivotItem>
+            </Pivot>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Cancelar" Click="Back_Click" />
+            <Button Content="Guardar" Style="{StaticResource AccentButtonStyle}" Click="Save_Click" />
+        </StackPanel>
+    </Grid>
+</Page>

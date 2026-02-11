@@ -331,24 +331,68 @@ public sealed partial class DocumentsView : Page
         var folder = (sender as MenuFlyoutItem)?.DataContext as FolderDto ?? FoldersList.SelectedItem as FolderDto;
         if (folder == null) return;
 
+        // 1. Check if folder has contents
         if (folder.DocumentCount > 0 || folder.SubFolderCount > 0)
         {
-            var errorDialog = new ContentDialog { Title = "Error", Content = "No se puede eliminar una carpeta que contiene documentos o subcarpetas.", CloseButtonText = "OK", XamlRoot = this.XamlRoot };
+            var errorDialog = new ContentDialog 
+            { 
+                Title = "Error", 
+                Content = $"No se puede eliminar la carpeta '{folder.Name}' porque contiene {folder.DocumentCount} documento(s) y {folder.SubFolderCount} subcarpeta(s).", 
+                CloseButtonText = "OK", 
+                XamlRoot = this.XamlRoot 
+            };
             await errorDialog.ShowAsync();
             return;
         }
 
+        // 2. Check admin permission - this method shows its own dialog if not admin
         if (!await CheckAdminPermission()) return;
 
-        var confirm = new ContentDialog { Title = "Confirmar eliminación", Content = $"¿Seguro que deseas eliminar la carpeta '{folder.Name}'?", PrimaryButtonText = "Eliminar", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close, XamlRoot = this.XamlRoot };
-        if (await confirm.ShowAsync() == ContentDialogResult.Primary)
+        // 3. Show confirmation dialog
+        var confirm = new ContentDialog 
+        { 
+            Title = "Confirmar eliminación", 
+            Content = $"¿Seguro que deseas eliminar la carpeta vacía '{folder.Name}'?", 
+            PrimaryButtonText = "Eliminar", 
+            CloseButtonText = "Cancelar", 
+            DefaultButton = ContentDialogButton.Close, 
+            XamlRoot = this.XamlRoot 
+        };
+        
+        var result = await confirm.ShowAsync();
+        if (result == ContentDialogResult.Primary)
         {
-            var app = (App)Application.Current;
-            if (await app.FolderService.DeleteFolderAsync(folder.Id))
+            try
             {
-                await LoadFoldersAsync();
-                _selectedFolder = null; // Reset selection
-                await LoadDocumentsAsync();
+                var app = (App)Application.Current;
+                if (await app.FolderService.DeleteFolderAsync(folder.Id))
+                {
+                    await LoadFoldersAsync();
+                    _selectedFolder = null;
+                    await LoadDocumentsAsync();
+                }
+                else
+                {
+                    var failDialog = new ContentDialog
+                    {
+                        Title = "Error",
+                        Content = "No se pudo eliminar la carpeta. Es posible que todavía contenga documentos en la base de datos.",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+                    await failDialog.ShowAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                var exDialog = new ContentDialog
+                {
+                    Title = "Error inesperado",
+                    Content = $"Error al eliminar la carpeta: {ex.Message}",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                await exDialog.ShowAsync();
             }
         }
     }
@@ -403,16 +447,7 @@ public sealed partial class DocumentsView : Page
                 if (result)
                 {
                     await LoadDocumentsAsync();
-                    
-                    // Success message
-                    var success = new ContentDialog
-                    {
-                        Title = "Éxito",
-                        Content = $"Documento '{doc.DocCode}' eliminado correctamente.",
-                        CloseButtonText = "OK",
-                        XamlRoot = this.XamlRoot
-                    };
-                    await success.ShowAsync();
+                    // Success - no dialog needed, list refresh is enough feedback
                 }
                 else
                 {
@@ -433,7 +468,7 @@ public sealed partial class DocumentsView : Page
                 var error = new ContentDialog
                 {
                     Title = "Excepción al eliminar",
-                    Content = $"Error: {ex.Message}\n\nStack: {(ex.StackTrace ?? "No stack trace").Substring(0, Math.Min(200, (ex.StackTrace ?? "").Length))}",
+                    Content = $"Error: {ex.Message}",
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot
                 };

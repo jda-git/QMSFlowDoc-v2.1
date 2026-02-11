@@ -46,15 +46,9 @@ public class AuthorizationService : IAuthorizationService
 
     public async Task<IEnumerable<GlobalAuthorizationDto>> GetAllAuthorizationsAsync(string? staffName = null, string? status = null)
     {
-        try
-        {
-           throw new NotImplementedException();
-        }
-        catch
-        {
-            var store = await GetLocalStoreAsync();
-            return await store.GetAllAuthorizationsAsync(staffName, status);
-        }
+        // Local-first: use local store directly (API integration reserved for future)
+        var store = await GetLocalStoreAsync();
+        return await store.GetAllAuthorizationsAsync(staffName, status);
     }
 
     public async Task<bool> GrantAuthorizationAsync(GrantAuthorizationRequest request)

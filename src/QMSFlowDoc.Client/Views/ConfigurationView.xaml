@@ -13,32 +13,11 @@
         <StackPanel Spacing="32" MaxWidth="800" HorizontalAlignment="Left">
             <TextBlock Text="Configuración del Sistema" Style="{StaticResource TitleTextBlockStyle}" />
 
-            <!-- Reagent Types Section -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Tipos de Reactivos" Style="{StaticResource SubtitleTextBlockStyle}" />
-                <TextBlock Text="Defina los tipos de reactivos disponibles en el sistema." Foreground="Gray" />
-                
-                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
-                    <TextBox x:Name="NewTypeBox" PlaceholderText="Nombre del nuevo tipo" />
-                    <Button Content="Agregar" Click="AddReagentType_Click" Grid.Column="1" />
-                </Grid>
-
-                <ListView x:Name="ReagentTypesList" BorderThickness="1" BorderBrush="#E0E0E0" CornerRadius="4" Height="200">
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:ReagentType">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" 
-                                        Click="DeleteType_Click" CommandParameter="{x:Bind Id}" 
-                                        Style="{StaticResource TextBlockButtonStyle}" Foreground="Red" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+            <!-- Security & Permissions -->
+            <StackPanel x:Name="SecurityPanel" Spacing="12" Visibility="Collapsed">
+                <TextBlock Text="Seguridad y Accesos" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock Text="Gestione los roles y permisos de los usuarios." Foreground="Gray" />
+                <Button Content="Configurar Matriz de Permisos" Click="ManagePermissions_Click" />
             </StackPanel>
 
             <!-- Network Storage Configuration -->

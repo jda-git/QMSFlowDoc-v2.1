@@ -65,7 +65,8 @@ public record RegisterTrainingRequest(
     DateTime CompletedAt,
     string Result,
     string? Notes,
-    Guid? CompetencyId = null
+    Guid? CompetencyId = null,
+    string? SourceCertificatePath = null
 );
 
 public record UpdateTrainingRequest(
@@ -77,7 +78,8 @@ public record UpdateTrainingRequest(
     DateTime CompletedAt,
     string Result,
     string? Notes,
-    Guid? CompetencyId = null
+    Guid? CompetencyId = null,
+    string? SourceCertificatePath = null
 );
 
 // Evaluación de competencia - ahora con texto libre

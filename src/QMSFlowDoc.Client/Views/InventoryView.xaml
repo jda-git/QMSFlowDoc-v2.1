@@ -10,28 +10,67 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid Padding="24" RowDefinitions="Auto, *">
-        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,24">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="16" Margin="0,0,0,24">
             <TextBlock Text="Inventario" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
-            <CommandBar DefaultLabelPosition="Right" Background="Transparent">
-                <AppBarButton Icon="Add" Label="Nuevo Reactivo" Click="AddReagent_Click" />
-                <AppBarButton x:Name="ModifyButton" Icon="Edit" Label="Modificar Artículo" Click="ModifyReagent_Click" IsEnabled="False" />
-                <AppBarSeparator />
-                <AppBarButton Icon="Add" Label="Entrada (Lote)" Click="RegisterLot_Click" />
-                <AppBarButton Icon="Remove" Label="Salida/Consumo" Click="RegisterExit_Click" />
-                <AppBarButton Icon="Download" Label="Exportar Excel" Click="ExportExcel_Click" />
-                <AppBarButton Icon="Print" Label="Imprimir" Click="Print_Click" />
-                <AppBarSeparator />
-                <AppBarButton Icon="Delete" Label="BORRAR REGISTRO" Click="DeleteReagent_Click" Foreground="Red" />
-            </CommandBar>
-
             
-            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="12,0,0,0">
+                <Button x:Name="AddReagentButton" Click="AddReagent_Click" Background="Transparent" BorderThickness="0" Padding="8,4">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Add" />
+                        <TextBlock Text="Nuevo" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ModifyButton" Click="ModifyReagent_Click" IsEnabled="False" Background="Transparent" BorderThickness="0" Padding="8,4">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Edit" />
+                        <TextBlock Text="Modificar" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                
+                <Rectangle Width="1" Height="24" Fill="{ThemeResource SystemControlForegroundBaseLowBrush}" Margin="4,0" VerticalAlignment="Center" Opacity="0.4" />
+                
+                <Button x:Name="RegisterLotButton" Click="RegisterLot_Click" Background="Transparent" BorderThickness="0" Padding="8,4">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Add" />
+                        <TextBlock Text="Entrada" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="RegisterExitButton" Click="RegisterExit_Click" Background="Transparent" BorderThickness="0" Padding="8,4">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Remove" />
+                        <TextBlock Text="Salida" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ExportExcelButton" Click="ExportExcel_Click" Background="Transparent" BorderThickness="0" Padding="8,4">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Download" />
+                        <TextBlock Text="Excel" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="PrintButton" Click="Print_Click" Background="Transparent" BorderThickness="0" Padding="8,4">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Print" />
+                        <TextBlock Text="Imprimir" FontSize="11" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Rectangle Width="1" Height="24" Fill="{ThemeResource SystemControlForegroundBaseLowBrush}" Margin="4,0" VerticalAlignment="Center" Opacity="0.4" />
+
+                <Button x:Name="DeleteReagentButton" Click="DeleteReagent_Click" Background="Transparent" BorderThickness="0" Padding="8,4" Foreground="Red">
+                    <StackPanel Spacing="2">
+                        <SymbolIcon Symbol="Delete" Foreground="Red" />
+                        <TextBlock Text="Eliminar" FontSize="11" HorizontalAlignment="Center" Foreground="Red" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                 <ToggleSwitch x:Name="ActiveFilter" Header="Solo Activos" IsOn="True" Toggled="Filter_Toggled" OffContent="No" OnContent="Sí" />
                 <ToggleSwitch x:Name="LowStockFilter" Header="Stock Bajo" IsOn="False" Toggled="Filter_Toggled" OffContent="No" OnContent="Sí" />
             </StackPanel>
 
-            <AutoSuggestBox PlaceholderText="Buscar..." QueryIcon="Find" Width="200" VerticalAlignment="Center" TextChanged="SearchBox_TextChanged" />
-        </StackPanel>
+            <AutoSuggestBox Grid.Column="3" PlaceholderText="Buscar..." QueryIcon="Find" Width="200" VerticalAlignment="Center" TextChanged="SearchBox_TextChanged" />
+        </Grid>
         
         <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,0,0,0" Grid.Row="1" Canvas.ZIndex="1" />
         

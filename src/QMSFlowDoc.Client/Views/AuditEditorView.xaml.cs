@@ -5,6 +5,7 @@ using QMSFlowDoc.Shared.DTOs;
 using QMSFlowDoc.Shared.Models;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Windows.Storage.Pickers;
 using System.Linq;
 using System.IO;
@@ -13,6 +14,8 @@ namespace QMSFlowDoc.Client.Views;
 
 public sealed partial class AuditEditorView : Page
 {
+    private List<ChecklistItem> _checklistItems = new();
+
     public AuditEditorView()
     {
         this.InitializeComponent();
@@ -48,6 +51,14 @@ public sealed partial class AuditEditorView : Page
                 AuditorBox.Text = audit.LeadAuditor;
                 _reportDocumentId = audit.ReportDocumentId;
 
+                // Load Checklist
+                if (!string.IsNullOrEmpty(audit.ChecklistJson))
+                {
+                    try { _checklistItems = JsonSerializer.Deserialize<List<ChecklistItem>>(audit.ChecklistJson) ?? new(); }
+                    catch { _checklistItems = new(); }
+                }
+                RebuildChecklistUI();
+
                 // Load Findings
                 Findings.Clear();
                 if (audit.Findings != null)
@@ -58,8 +69,7 @@ public sealed partial class AuditEditorView : Page
 
                 if (audit.ReportDocument != null)
                 {
-                    FileNameText.Text = audit.ReportDocument.Title; // Or OriginalFileName if available
-                    // Show download/view button if possible
+                    FileNameText.Text = audit.ReportDocument.Title;
                     ViewReportButton.Visibility = Visibility.Visible;
                 }
             }
@@ -129,12 +139,17 @@ public sealed partial class AuditEditorView : Page
 
         try
         {
+            var checklistJson = _checklistItems.Count > 0 
+                ? JsonSerializer.Serialize(_checklistItems) 
+                : null;
+
             var request = new CreateAuditRequest(
                 TitleBox.Text,
                 ScheduledDatePicker.Date.UtcDateTime,
                 ScopeBox.Text,
                 AuditorBox.Text,
-                _reportDocumentId
+                _reportDocumentId,
+                checklistJson
             );
 
             var service = ((App)Application.Current).ImprovementService;
@@ -168,7 +183,46 @@ public sealed partial class AuditEditorView : Page
 
     private async void ViewReport_Click(object sender, RoutedEventArgs e)
     {
-        // Implementation preserved as placeholder for now
+        if (_reportDocumentId.HasValue)
+        {
+            try
+            {
+                var docService = ((App)Application.Current).DocumentService;
+                var bytes = await docService.GetFileContentAsync(_reportDocumentId.Value);
+
+                if (bytes != null && bytes.Length > 0)
+                {
+                    var tempFolder = Windows.Storage.ApplicationData.Current.TemporaryFolder;
+                    var file = await tempFolder.CreateFileAsync($"audit_report_{_reportDocumentId}.pdf", Windows.Storage.CreationCollisionOption.GenerateUniqueName);
+                    await Windows.Storage.FileIO.WriteBytesAsync(file, bytes);
+                    
+                    await Windows.System.Launcher.LaunchFileAsync(file);
+                }
+                else
+                {
+                     // Try local fallback message
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Documento no encontrado",
+                        Content = "No se pudo recuperar el archivo. Verifique si se subió correctamente.",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+                    await dialog.ShowAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                 var dialog = new ContentDialog
+                 {
+                     Title = "Error al abrir",
+                     Content = ex.Message,
+                     CloseButtonText = "OK",
+                     XamlRoot = this.XamlRoot
+                 };
+                 await dialog.ShowAsync();
+            }
+        }
     }
 
     private void Back_Click(object sender, RoutedEventArgs e)
@@ -200,71 +254,69 @@ public sealed partial class AuditEditorView : Page
                 // Refresh connection status to ensure we use API if available
                 await docService.InitializeAsync();
 
-                if (docService.IsLocalMode)
-                {
-                    FileNameText.Text = "Error: Modo Offline no permite vincular documentos a Auditoría Online.";
-                    return;
-                }
+                // Removed explicit LocalMode check to allow fallback to LocalDocumentStore
+
 
                 // 1. Fetch Document Types
                 var typeList = await docService.GetDocumentTypesAsync();
                 var reportType = typeList.FirstOrDefault(t => t.Name == "Reporte") ?? typeList.FirstOrDefault();
                 
-                if (reportType == null) throw new Exception("No se encontraron tipos de documentos configurados.");
-
-                // Lookup Folder
-                var folderId = await docService.GetOrCreateFolderIdAsync("AUDITORIA");
+                // 2. Prepare Folder Name (flat AUDITORIA folder)
+                var folderName = "AUDITORIA";
                 
-                if (folderId == null)
-                {
-                    FileNameText.Text = "Error: No se pudo crear/encontrar la carpeta 'AUDITORIA'.";
-                    return;
-                }
+                // 3. Prepare filename as MM-YYYY-Name.pdf
+                var date = ScheduledDatePicker.Date;
+                var datePrefix = $"{date.Month:D2}-{date.Year}";
+                var safeName = $"{datePrefix}-{TitleBox.Text.Replace(" ", "_")}.pdf";
 
-                // 2. Create Document Metadata
-                var createReq = new CreateDocumentRequest(
-                   DocCode: "AUD-" + DateTime.Now.Ticks.ToString().Substring(10),
-                   Title: $"Reporte Auditoría {TitleBox.Text}",
-                   DocumentTypeId: reportType.Id,
-                   FolderId: folderId, // Use AUDITORIA folder or null
-                   Area: "Improvement",
-                   Process: "Audit",
-                   Status: DocumentStatus.APPROVED, // Auto-approved for records
-                   ReviewIntervalMonths: 12, 
-                   VersionLabel: "v1.0"
+                // 4. Read File
+                using var stream = await file.OpenStreamForReadAsync();
+                var bytes = new byte[stream.Length];
+                await stream.ReadAsync(bytes, 0, bytes.Length);
+
+                // 5. Create Document directly
+                var doc = await docService.CreateDocumentWithFileAsync(
+                   docCode: $"AUD-{datePrefix}-{DateTime.Now.Ticks.ToString().Substring(12)}",
+                   title: $"Reporte Auditoría {TitleBox.Text}",
+                   status: DocumentStatus.APPROVED,
+                   documentTypeId: reportType?.Id,
+                   reviewIntervalMonths: 12, 
+                   versionLabel: "v1.0",
+                   area: "Improvement",
+                   process: "Audit",
+                   fileBytes: bytes,
+                   fileName: safeName,
+                   subFolderName: folderName
                 );
                 
-                var doc = await docService.CreateDocumentAsync(createReq);
                 if (doc != null)
                 {
-                     // 2. Upload Content
-                    using var stream = await file.OpenStreamForReadAsync();
-                    var bytes = new byte[stream.Length];
-                    await stream.ReadAsync(bytes, 0, bytes.Length);
+                    _reportDocumentId = doc.Id;
+                    FileNameText.Text = file.Name;
+                    ViewReportButton.Visibility = Visibility.Visible;
                     
-                    var success = await docService.UploadFileAsync(doc.Id, bytes, file.Name, file.ContentType);
-                    if (success) 
+                    // Auto-save the audit link
+                    if (_auditId.HasValue)
                     {
-                        _reportDocumentId = doc.Id;
-                        FileNameText.Text = file.Name;
-                        ViewReportButton.Visibility = Visibility.Visible;
-                        
-                        // Auto-save the audit link immediately to prevent sync issues if user forgets to click Save
-                        if (_auditId.HasValue)
-                        {
-                            // Trigger implicit save of the link
-                            // Actually, better wait for explicit save, but show success
+                        try {
+                            var updateReq = new CreateAuditRequest(
+                                TitleBox.Text,
+                                ScheduledDatePicker.Date.UtcDateTime,
+                                ScopeBox.Text,
+                                AuditorBox.Text,
+                                _reportDocumentId,
+                                _checklistItems.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(_checklistItems) : null
+                            );
+                            await ((App)Application.Current).ImprovementService.UpdateAuditAsync(_auditId.Value, updateReq);
+                            FileNameText.Text = $"{file.Name} (Guardado)";
+                        } catch {
                             FileNameText.Text = $"{file.Name} (Vinculado - Recuerde Guardar)";
                         }
-                    }
-                    else
-                    {
-                        FileNameText.Text = "Error al subir contenido al servidor.";
                     }
                 }
                 else
                 {
-                    FileNameText.Text = "Error: El servidor rechazó la creación del documento.";
+                    FileNameText.Text = "Error: El sistema no pudo crear el documento.";
                 }
             }
             catch (Exception ex)
@@ -274,4 +326,115 @@ public sealed partial class AuditEditorView : Page
         }
     }
 
+    private async void AddChecklistItem_Click(object sender, RoutedEventArgs e)
+    {
+        var questionBox = new TextBox 
+        { 
+            Header = "Pregunta de Verificación", 
+            PlaceholderText = "Ej: ¿Se calibran los equipos según plan?",
+            AcceptsReturn = false 
+        };
+
+        var dialog = new ContentDialog
+        {
+            Title = "Nuevo Ítem de Checklist",
+            Content = questionBox,
+            PrimaryButtonText = "Añadir",
+            CloseButtonText = "Cancelar",
+            XamlRoot = this.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(questionBox.Text))
+        {
+            _checklistItems.Add(new ChecklistItem { Question = questionBox.Text });
+            RebuildChecklistUI();
+        }
+    }
+
+    private void RebuildChecklistUI()
+    {
+        ChecklistListView.Items.Clear();
+        for (int idx = 0; idx < _checklistItems.Count; idx++)
+        {
+            var item = _checklistItems[idx];
+            int capturedIdx = idx;
+
+            var row = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
+                    new ColumnDefinition { Width = new GridLength(100, GridUnitType.Pixel) },
+                    new ColumnDefinition { Width = new GridLength(200, GridUnitType.Pixel) },
+                    new ColumnDefinition { Width = new GridLength(32, GridUnitType.Pixel) }
+                },
+                Padding = new Thickness(8, 4, 8, 4)
+            };
+
+            var questionText = new TextBlock
+            {
+                Text = item.Question,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            var answerCombo = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                SelectedIndex = item.Answer switch { "Sí" => 0, "No" => 1, "N/A" => 2, _ => -1 }
+            };
+            answerCombo.Items.Add("Sí");
+            answerCombo.Items.Add("No");
+            answerCombo.Items.Add("N/A");
+            answerCombo.SelectionChanged += (s, args) =>
+            {
+                if (answerCombo.SelectedItem is string val)
+                    _checklistItems[capturedIdx].Answer = val;
+            };
+
+            var obsBox = new TextBox
+            {
+                PlaceholderText = "Observaciones...",
+                Text = item.Observations ?? "",
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            obsBox.TextChanged += (s, args) =>
+            {
+                _checklistItems[capturedIdx].Observations = obsBox.Text;
+            };
+
+            var deleteBtn = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE74D", FontSize = 12 },
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(4)
+            };
+            deleteBtn.Click += (s, args) =>
+            {
+                _checklistItems.RemoveAt(capturedIdx);
+                RebuildChecklistUI();
+            };
+
+            Grid.SetColumn(questionText, 0);
+            Grid.SetColumn(answerCombo, 1);
+            Grid.SetColumn(obsBox, 2);
+            Grid.SetColumn(deleteBtn, 3);
+
+            row.Children.Add(questionText);
+            row.Children.Add(answerCombo);
+            row.Children.Add(obsBox);
+            row.Children.Add(deleteBtn);
+
+            ChecklistListView.Items.Add(row);
+        }
+        ChecklistCountText.Text = $"{_checklistItems.Count} ítem(s)";
+    }
+}
+
+public class ChecklistItem
+{
+    public string Question { get; set; } = string.Empty;
+    public string? Answer { get; set; }  // "Sí", "No", "N/A"
+    public string? Observations { get; set; }
 }

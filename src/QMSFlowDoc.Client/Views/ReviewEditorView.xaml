@@ -18,6 +18,39 @@
             </StackPanel>
 
             <StackPanel Spacing="16">
+                <!-- Auto-consolidated Annual Summary (ISO 15189 §8.9) -->
+                <Expander Header="📊 Resumen Consolidado del Período (Auto-generado)" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" IsExpanded="True">
+                    <Grid x:Name="ConsolidatedSummaryGrid" Padding="12" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto" ColumnSpacing="24" RowSpacing="8">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="#E81123" />
+                            <TextBlock x:Name="SummaryNC" Text="No conformidades: cargando..." />
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="#FF8C00" />
+                            <TextBlock x:Name="SummaryRisks" Text="Riesgos críticos: cargando..." />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE71C;" FontSize="16" Foreground="#0078D4" />
+                            <TextBlock x:Name="SummaryAudits" Text="Auditorías: cargando..." />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8F1;" FontSize="16" Foreground="#107C10" />
+                            <TextBlock x:Name="SummaryEQA" Text="EQA: cargando..." />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE77B;" FontSize="16" Foreground="#5B2C6F" />
+                            <TextBlock x:Name="SummaryCompetencies" Text="Competencias: cargando..." />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE82D;" FontSize="16" Foreground="#515C6B" />
+                            <TextBlock x:Name="SummaryDocs" Text="Documentos: cargando..." />
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="#515C6B" />
+                            <TextBlock x:Name="SummaryEquipment" Text="Equipos: cargando..." />
+                        </StackPanel>
+                    </Grid>
+                </Expander>
                 <DatePicker x:Name="ReviewDatePicker" Header="Fecha de Revisión" />
                 
                 <TextBox x:Name="ParticipantsBox" Header="Participantes" PlaceholderText="Lista de asistentes..." AcceptsReturn="True" Height="60" />

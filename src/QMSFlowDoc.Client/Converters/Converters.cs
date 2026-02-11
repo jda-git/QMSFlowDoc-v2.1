@@ -14,7 +14,7 @@ public class StringVisibilityConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -31,7 +31,7 @@ public class IntToVisibilityConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -54,7 +54,7 @@ public class PerformanceColorConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -71,7 +71,7 @@ public class DoubleDisplayConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -85,7 +85,7 @@ public class NullToVisibilityConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -102,7 +102,7 @@ public class StatusToVisibilityConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -117,7 +117,7 @@ public class NullableDateConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
 }
 
@@ -139,6 +139,27 @@ public class StatusBackgroundConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
     {
-        throw new NotImplementedException();
+        return DependencyProperty.UnsetValue;
     }
+}
+
+public class DateFormatConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is DateTime dt) return dt.ToString("dd/MM/yyyy");
+        if (value is DateTimeOffset dto) return dto.ToString("dd/MM/yyyy");
+        return "-";
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, string language) => DependencyProperty.UnsetValue;
+}
+
+public class BoolToColorConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is bool b) return b ? new SolidColorBrush(Microsoft.UI.Colors.Green) : new SolidColorBrush(Microsoft.UI.Colors.Red);
+        return new SolidColorBrush(Microsoft.UI.Colors.Gray);
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, string language) => DependencyProperty.UnsetValue;
 }

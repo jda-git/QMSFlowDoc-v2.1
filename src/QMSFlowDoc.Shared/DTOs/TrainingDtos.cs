@@ -21,7 +21,8 @@ public record StaffTrainingDto(
     DateTime CompletionDate,
     decimal Hours,
     string? Result,
-    Guid? CompetencyId = null
+    Guid? CompetencyId = null,
+    string? CertificatePath = null
 );
 
 public class GlobalTrainingDto
@@ -38,6 +39,8 @@ public class GlobalTrainingDto
     public string? Result { get; set; }
     public string? CompetencyNameRef { get; set; }
     public Guid? CompetencyId { get; set; }
+    public string? CertificatePath { get; set; }
+    public bool HasCertificate => !string.IsNullOrEmpty(CertificatePath);
 }
 
 public record CreateTrainingActivityRequest(

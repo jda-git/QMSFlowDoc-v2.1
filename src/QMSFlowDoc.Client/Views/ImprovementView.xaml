@@ -22,13 +22,64 @@
                 <TabViewItem.IconSource>
                     <SymbolIconSource Symbol="ReportHacked" />
                 </TabViewItem.IconSource>
-                <Grid Padding="12" RowDefinitions="Auto, *">
+                <Grid Padding="12" RowDefinitions="Auto, Auto, *">
                     <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,12">
                         <Button Content="Nuevo Riesgo" Style="{StaticResource AccentButtonStyle}" Click="AddRisk_Click" />
                         <Button Content="Exportar Matriz" Click="ExportMatrix_Click" />
                         <ToggleSwitch x:Name="ActiveRisksFilter" Header="Solo Activos" OnContent="Sí" OffContent="No" IsOn="True" Toggled="Filter_Toggled" />
                     </StackPanel>
-                    <ListView Grid.Row="1" x:Name="RisksList" ItemsSource="{x:Bind Risks, Mode=OneWay}" SelectionMode="Single" IsItemClickEnabled="False" DoubleTapped="RisksList_DoubleTapped">
+
+                    <!-- Risk Heat-Map Matrix 5x5 -->
+                    <Border Grid.Row="1" Margin="0,0,0,16" Padding="12" CornerRadius="8" 
+                            Background="{ThemeResource LayerFillColorDefaultBrush}" 
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="Mapa de Calor — Probabilidad × Impacto" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,0,0,8" />
+                            <Grid x:Name="RiskMatrixGrid" HorizontalAlignment="Left">
+                                <!-- 6 columns: label + 5 impact levels -->
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="70" />
+                                </Grid.ColumnDefinitions>
+                                <!-- 7 rows: header + 5 likelihood levels + impact labels -->
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="24" />
+                                    <RowDefinition Height="50" />
+                                    <RowDefinition Height="50" />
+                                    <RowDefinition Height="50" />
+                                    <RowDefinition Height="50" />
+                                    <RowDefinition Height="50" />
+                                    <RowDefinition Height="24" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Column header: Impact labels -->
+                                <TextBlock Text="" Grid.Row="0" Grid.Column="0" />
+                                <TextBlock Text="Mínimo" Grid.Row="0" Grid.Column="1" FontSize="11" HorizontalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Menor" Grid.Row="0" Grid.Column="2" FontSize="11" HorizontalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Moderado" Grid.Row="0" Grid.Column="3" FontSize="11" HorizontalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Mayor" Grid.Row="0" Grid.Column="4" FontSize="11" HorizontalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Catastrófico" Grid.Row="0" Grid.Column="5" FontSize="11" HorizontalAlignment="Center" Foreground="Gray" />
+
+                                <!-- Row labels: Likelihood (from top=5 to bottom=1) -->
+                                <TextBlock Text="Muy Alta (5)" Grid.Row="1" Grid.Column="0" FontSize="11" VerticalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Alta (4)" Grid.Row="2" Grid.Column="0" FontSize="11" VerticalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Media (3)" Grid.Row="3" Grid.Column="0" FontSize="11" VerticalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Baja (2)" Grid.Row="4" Grid.Column="0" FontSize="11" VerticalAlignment="Center" Foreground="Gray" />
+                                <TextBlock Text="Muy Baja (1)" Grid.Row="5" Grid.Column="0" FontSize="11" VerticalAlignment="Center" Foreground="Gray" />
+
+                                <!-- Bottom axis label -->
+                                <TextBlock Text="IMPACTO →" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="5" FontSize="11" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="Gray" />
+
+                                <!-- 25 cells populated programmatically -->
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <ListView Grid.Row="2" x:Name="RisksList" ItemsSource="{x:Bind Risks, Mode=OneWay}" SelectionMode="Single" IsItemClickEnabled="False" DoubleTapped="RisksList_DoubleTapped">
                         <ListView.HeaderTemplate>
                             <DataTemplate>
                                 <Grid Padding="12,0,0,0">
@@ -164,6 +215,54 @@
                                     <Button Grid.Column="3" Background="Transparent" BorderThickness="0" Click="DeleteReview_Click" Tag="{x:Bind Id}" HorizontalAlignment="Center" Foreground="Red">
                                         <SymbolIcon Symbol="Cancel" />
                                     </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </TabViewItem>
+
+            <!-- Contingency Plans Tab (ISO 15189 §7.8) -->
+            <TabViewItem Header="Contingencia" IsClosable="False">
+                <TabViewItem.IconSource>
+                    <SymbolIconSource Symbol="Permissions" />
+                </TabViewItem.IconSource>
+                <Grid Padding="12" RowDefinitions="Auto, *">
+                    <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,12">
+                        <Button Content="Nuevo Plan" Style="{StaticResource AccentButtonStyle}" Click="AddContingency_Click" />
+                    </StackPanel>
+                    <ListView Grid.Row="1" x:Name="ContingencyList" SelectionMode="None"
+                              ItemsSource="{x:Bind Contingencies}"
+                              IsItemClickEnabled="True" ItemClick="ContingencyList_ItemClick">
+                        <ListView.HeaderTemplate>
+                            <DataTemplate>
+                                <Grid Padding="12,0,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="200" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Plan" FontWeight="Bold" Grid.Column="0" />
+                                    <TextBlock Text="Evento Disparador" FontWeight="Bold" Grid.Column="1" />
+                                    <TextBlock Text="Estado" FontWeight="Bold" Grid.Column="2" />
+                                    <TextBlock Text="Última Revisión" FontWeight="Bold" Grid.Column="3" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.HeaderTemplate>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="dto:ContingencyListDto">
+                                <Grid Padding="0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="200" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Title}" Grid.Column="0" />
+                                    <TextBlock Text="{x:Bind TriggerEvent}" Grid.Column="1" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind Status.ToString()}" Grid.Column="2" />
+                                    <TextBlock Text="{x:Bind LastReviewDateDisplay}" Grid.Column="3" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>

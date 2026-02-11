@@ -32,6 +32,24 @@ public enum InventoryMovementType
     RETURN
 }
 
+// ISO 15189:2022 - Supplier Types (Apartado 6.8)
+public enum SupplierType
+{
+    SUMINISTROS_REACTIVOS,
+    SERVICIO_TECNICO,
+    LABORATORIO_DERIVACION
+}
+
+// ISO 15189:2022 - Supplier Quality Status
+public enum SupplierQualityStatus
+{
+    PENDIENTE,
+    APTO,
+    NO_APTO,
+    EN_OBSERVACION,
+    EVALUACION_CADUCADA
+}
+
 public class Supplier
 {
     public Guid Id { get; set; }
@@ -39,7 +57,16 @@ public class Supplier
     public string? ContactName { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
+    public string? Address { get; set; }
     public string? Notes { get; set; }
+    
+    // ISO 15189:2022 Evaluation Fields
+    public SupplierType Type { get; set; } = SupplierType.SUMINISTROS_REACTIVOS;
+    public SupplierQualityStatus QualityStatus { get; set; } = SupplierQualityStatus.PENDIENTE;
+    public DateTime? LastEvaluationDate { get; set; }
+    public DateTime? NextEvaluationDate { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class StorageLocation

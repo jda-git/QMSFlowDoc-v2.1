@@ -1,0 +1,97 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.SuppliersView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:QMSFlowDoc.Client.Views"
+    xmlns:dto="using:QMSFlowDoc.Shared.DTOs"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid Padding="24" RowDefinitions="Auto, Auto, *">
+        <!-- Header -->
+        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,16">
+            <TextBlock Text="Gestión de Proveedores" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+            <Button Content="Nuevo Proveedor" Style="{StaticResource AccentButtonStyle}" Click="AddSupplier_Click" />
+            <Button Content="Editar" Click="EditSupplier_Click" />
+            <Button Content="Evaluar" Click="EvaluateSupplier_Click" />
+            <Button Content="Eliminar" Click="DeleteSupplier_Click" Foreground="Red" />
+        </StackPanel>
+
+        <!-- Filters -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+            <ComboBox x:Name="TypeFilterCombo" Header="Tipo" Width="200" SelectionChanged="Filter_Changed">
+                <ComboBoxItem Content="Todos" IsSelected="True" />
+                <ComboBoxItem Content="Suministros/Reactivos" />
+                <ComboBoxItem Content="Servicio Técnico" />
+                <ComboBoxItem Content="Laboratorio Derivación" />
+            </ComboBox>
+            <ComboBox x:Name="StatusFilterCombo" Header="Estado" Width="200" SelectionChanged="Filter_Changed">
+                <ComboBoxItem Content="Todos" IsSelected="True" />
+                <ComboBoxItem Content="Apto" />
+                <ComboBoxItem Content="No Apto" />
+                <ComboBoxItem Content="Pendiente" />
+                <ComboBoxItem Content="Caducado" />
+            </ComboBox>
+            <TextBox x:Name="SearchBox" Header="Buscar" Width="250" TextChanged="SearchBox_TextChanged" PlaceholderText="Nombre del proveedor..." />
+        </StackPanel>
+
+        <!-- Loading -->
+        <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Visibility="Collapsed" Grid.Row="2" VerticalAlignment="Top" />
+
+        <!-- List -->
+        <ListView x:Name="SuppliersList" Grid.Row="2" ItemsSource="{x:Bind FilteredSuppliers, Mode=OneWay}" SelectionMode="Single">
+            <ListView.HeaderTemplate>
+                <DataTemplate>
+                    <Grid Padding="12,8" Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="80" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Nombre" FontWeight="Bold" Grid.Column="0" />
+                        <TextBlock Text="Tipo" FontWeight="Bold" Grid.Column="1" />
+                        <TextBlock Text="Última Eval." FontWeight="Bold" Grid.Column="2" />
+                        <TextBlock Text="Próxima Eval." FontWeight="Bold" Grid.Column="3" />
+                        <TextBlock Text="Estado" FontWeight="Bold" Grid.Column="4" />
+                        <TextBlock Text="Incid." FontWeight="Bold" Grid.Column="5" HorizontalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.HeaderTemplate>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="dto:SupplierListDto">
+                    <Grid Padding="0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="80" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind Name}" Grid.Column="0" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind Type}" Grid.Column="1" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind LastEvaluationDate}" Grid.Column="2" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind NextEvaluationDate}" Grid.Column="3" VerticalAlignment="Center" />
+                        <Border Grid.Column="4" CornerRadius="4" Padding="8,4" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                Background="{x:Bind local:SuppliersView.GetStatusColor(QualityStatus)}">
+                            <TextBlock Text="{x:Bind QualityStatus}" Foreground="White" FontSize="12" />
+                        </Border>
+                        <TextBlock Text="{x:Bind IncidentCount}" Grid.Column="5" HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                   Foreground="{x:Bind local:SuppliersView.GetIncidentColor(IncidentCount)}" FontWeight="Bold" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Empty State -->
+        <StackPanel x:Name="EmptyState" Grid.Row="2" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+            <FontIcon Glyph="&#xE77B;" FontSize="48" Foreground="Gray" />
+            <TextBlock Text="No hay proveedores registrados" FontSize="18" Foreground="Gray" />
+        </StackPanel>
+    </Grid>
+</Page>

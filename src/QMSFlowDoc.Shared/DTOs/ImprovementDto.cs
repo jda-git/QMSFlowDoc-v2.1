@@ -53,7 +53,8 @@ public record CreateAuditRequest(
     DateTime ScheduledDate,
     string Scope,
     string? LeadAuditor,
-    Guid? ReportDocumentId = null
+    Guid? ReportDocumentId = null,
+    string? ChecklistJson = null
 );
 
 public record RegisterFindingRequest(
@@ -88,3 +89,50 @@ public record CreateManagementReviewRequest(
     Guid? MinutesDocumentId = null
 );
 
+// === IQC DTOs ===
+
+public class IQCListDto
+{
+    public Guid Id { get; set; }
+    public string EquipmentName { get; set; } = string.Empty;
+    public string AnalyteName { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public double Value { get; set; }
+    public IQCStatus Status { get; set; }
+    public DateTime Date { get; set; }
+    public string? WestgardRule { get; set; }
+
+    public IQCListDto() { }
+}
+
+public record CreateIQCResultRequest(
+    string EquipmentName,
+    string AnalyteName,
+    string Level,
+    double Value,
+    double Mean,
+    double SD,
+    DateTime Date,
+    string? Comments
+);
+
+// === Contingency DTOs ===
+
+public class ContingencyListDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string TriggerEvent { get; set; } = string.Empty;
+    public ContingencyStatus Status { get; set; }
+    public DateTime? LastReviewDate { get; set; }
+    public string LastReviewDateDisplay => LastReviewDate.HasValue ? LastReviewDate.Value.ToString("d") : "Pendiente";
+
+    public ContingencyListDto() { }
+}
+
+public record CreateContingencyPlanRequest(
+    string Title,
+    string TriggerEvent,
+    string ProcedureSteps,
+    string? ResponsiblePerson
+);

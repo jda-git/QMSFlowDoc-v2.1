@@ -34,6 +34,18 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- Audit Checklist (ISO 15189 §8.8) -->
+                <Expander Header="Checklist de Verificación" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" IsExpanded="True">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Content="Añadir Ítem" Click="AddChecklistItem_Click" Style="{StaticResource AccentButtonStyle}" />
+                            <TextBlock x:Name="ChecklistCountText" VerticalAlignment="Center" Foreground="Gray" Text="0 ítems" />
+                        </StackPanel>
+                        <ListView x:Name="ChecklistListView" MaxHeight="300" BorderThickness="1" BorderBrush="#E0E0E0" CornerRadius="4">
+                        </ListView>
+                    </StackPanel>
+                </Expander>
+
                 <!-- Findings Section -->
                 <Grid RowDefinitions="Auto, Auto">
                     <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,8">

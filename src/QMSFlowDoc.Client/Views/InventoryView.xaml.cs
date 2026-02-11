@@ -30,10 +30,49 @@ public sealed partial class InventoryView : Page
         _authService = ((App)Application.Current).AuthService;
     }
 
+    private bool _canModify = false;
+    private bool _canDelete = false;
+
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        await UpdatePermissions();
         await LoadReagents();
+    }
+
+    private async Task UpdatePermissions()
+    {
+        var app = (App)Application.Current;
+        var perms = app.PermissionsService;
+        var roles = app.AuthService.CurrentRoles;
+
+        async Task<bool> Check(string key)
+        {
+            if (app.AuthService.IsAdmin) return true;
+            foreach (var r in roles)
+            {
+                if (await perms.HasPermissionAsync(r, key)) return true;
+            }
+            return false;
+        }
+
+        AddReagentButton.IsEnabled = await Check("Inventory.CreateReagent");
+        RegisterLotButton.IsEnabled = await Check("Inventory.Entry");
+        RegisterExitButton.IsEnabled = await Check("Inventory.Exit");
+        ExportExcelButton.IsEnabled = await Check("Inventory.Export");
+        PrintButton.IsEnabled = await Check("Inventory.Print");
+
+        _canModify = await Check("Inventory.EditReagent");
+        _canDelete = await Check("Inventory.Delete");
+
+        DeleteReagentButton.Visibility = _canDelete ? Visibility.Visible : Visibility.Collapsed;
+        
+        UpdateModifyButtonState();
+    }
+
+    private void UpdateModifyButtonState()
+    {
+        ModifyButton.IsEnabled = _canModify && ReagentsList.SelectedItem != null;
     }
 
     private async Task LoadReagents()
@@ -61,7 +100,66 @@ public sealed partial class InventoryView : Page
             if (LoadingBar != null) LoadingBar.Visibility = Visibility.Collapsed;
             if (ReagentsList != null) ReagentsList.Opacity = 1.0;
         }
+    }
 
+    private void ReagentsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateModifyButtonState();
+    }
+
+    private async void ModifyReagent_Click(object sender, RoutedEventArgs e)
+    {
+        if (ReagentsList.SelectedItem is ReagentListDto reagent)
+        {
+            if (!_canModify)
+            {
+                ShowError("Acceso denegado.");
+                return;
+            }
+
+            Frame.Navigate(typeof(ReagentEditorView), reagent.Id);
+        }
+    }
+
+    private async void DeleteReagent_Click(object sender, RoutedEventArgs e)
+    {
+        if (ReagentsList.SelectedItem is not ReagentListDto selected)
+        {
+            ShowError("Seleccione un reactivo para borrar.");
+            return;
+        }
+
+        if (!_canDelete)
+        {
+            ShowError("Acceso denegado.");
+            return;
+        }
+
+        // Confirm deletion
+        var confirmMsg = $"¿Está seguro de eliminar {selected.Name} {selected.Fluorescence}?\nEsta acción marcará el reactivo como obsoleto.";
+        var dialog = new ContentDialog
+        {
+            Title = "Confirmar eliminación",
+            Content = confirmMsg,
+            PrimaryButtonText = "Borrar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = this.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            var success = await _inventoryService.DeleteReagentAsync(selected.Id);
+            if (success)
+            {
+                await LoadReagents();
+                ShowError("Registro borrado correctamente.");
+            }
+            else
+            {
+                ShowError("Error al borrar el reactivo.");
+            }
+        }
     }
 
 
@@ -427,67 +525,7 @@ public sealed partial class InventoryView : Page
         await d.ShowAsync();
     }
 
-    private void ReagentsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        ModifyButton.IsEnabled = ReagentsList.SelectedItem != null;
-    }
 
-    private async void ModifyReagent_Click(object sender, RoutedEventArgs e)
-    {
-        if (ReagentsList.SelectedItem is ReagentListDto reagent)
-        {
-            // Check admin role instead of password
-            if (!_authService.IsAdmin)
-            {
-                ShowError("Acceso denegado. Se requieren permisos de administrador.");
-                return;
-            }
-
-            Frame.Navigate(typeof(ReagentEditorView), reagent.Id);
-        }
-    }
-
-    private async void DeleteReagent_Click(object sender, RoutedEventArgs e)
-    {
-        if (ReagentsList.SelectedItem is not ReagentListDto selected)
-        {
-            ShowError("Seleccione un reactivo para borrar.");
-            return;
-        }
-
-        // Check admin role instead of password
-        if (!_authService.IsAdmin)
-        {
-            ShowError("Acceso denegado. Se requieren permisos de administrador.");
-            return;
-        }
-
-        // Confirm deletion
-        var confirmMsg = $"¿Está seguro de eliminar {selected.Name} {selected.Fluorescence}?\nEsta acción marcará el reactivo como obsoleto.";
-        var dialog = new ContentDialog
-        {
-            Title = "Confirmar eliminación",
-            Content = confirmMsg,
-            PrimaryButtonText = "Borrar",
-            CloseButtonText = "Cancelar",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = this.XamlRoot
-        };
-
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-        {
-            var success = await _inventoryService.DeleteReagentAsync(selected.Id);
-            if (success)
-            {
-                await LoadReagents();
-                ShowError("Registro borrado correctamente.");
-            }
-            else
-            {
-                ShowError("Error al borrar el reactivo.");
-            }
-        }
-    }
     public static Microsoft.UI.Xaml.Media.Brush GetStatusColor(int status)
     {
         return status switch

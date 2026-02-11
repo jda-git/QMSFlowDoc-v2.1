@@ -99,6 +99,17 @@ public sealed partial class ReagentEditorView : Page
         Frame.GoBack();
     }
 
+    private async void ManageTypes_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Dialogs.ManageReagentTypesDialog();
+        dialog.XamlRoot = this.Content.XamlRoot;
+        await dialog.ShowAsync();
+        
+        // Refresh ComboBox
+        string? currentText = (TypeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString();
+        await LoadTypes(currentText);
+    }
+
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         ErrorText.Visibility = Visibility.Collapsed;

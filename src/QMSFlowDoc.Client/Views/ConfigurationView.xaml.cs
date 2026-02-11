@@ -11,8 +11,6 @@ namespace QMSFlowDoc.Client.Views;
 
 public sealed partial class ConfigurationView : Page
 {
-    private List<ReagentType> _types = new();
-
     public ConfigurationView()
     {
         this.InitializeComponent();
@@ -21,18 +19,30 @@ public sealed partial class ConfigurationView : Page
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        
+        // Check permissions
+        var app = (App)Application.Current;
+        if (app.AuthService.IsAdmin)
+        {
+            SecurityPanel.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SecurityPanel.Visibility = Visibility.Collapsed;
+        }
+
         await LoadData();
+    }
+
+    private void ManagePermissions_Click(object sender, RoutedEventArgs e)
+    {
+        Frame.Navigate(typeof(PermissionsConfigView));
     }
 
     private async Task LoadData()
     {
         var service = ((App)Application.Current).ConfigurationService;
         
-        // Load Reagent Types
-        var types = await service.GetReagentTypesAsync();
-        _types = new List<ReagentType>(types);
-        ReagentTypesList.ItemsSource = _types;
-
         // Load Network Storage Configuration
         var app = (App)Application.Current;
         var networkPath = await app.NetworkConfigStore.GetNetworkBasePathAsync();
@@ -53,35 +63,6 @@ public sealed partial class ConfigurationView : Page
         AutoSyncCheckBox.IsChecked = config.AutoSyncOnStartup;
         SyncIntervalSlider.Value = config.SyncIntervalMinutes;
         InactivitySlider.Value = config.InactivityTimeoutMinutes > 0 ? config.InactivityTimeoutMinutes : 30;
-    }
-
-    // Reagent Types Management
-    
-    private async void AddReagentType_Click(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(NewTypeBox.Text)) return;
-
-        var service = ((App)Application.Current).ConfigurationService;
-        var newType = new ReagentType { Name = NewTypeBox.Text };
-        
-        var result = await service.CreateReagentTypeAsync(newType);
-        if (result != null)
-        {
-            NewTypeBox.Text = "";
-            await LoadData();
-        }
-    }
-
-    private async void DeleteType_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.CommandParameter is Guid id)
-        {
-             var service = ((App)Application.Current).ConfigurationService;
-             if (await service.DeleteReagentTypeAsync(id))
-             {
-                 await LoadData();
-             }
-        }
     }
 
     // Network Storage Configuration

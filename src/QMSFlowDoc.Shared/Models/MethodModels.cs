@@ -46,3 +46,18 @@ public class MethodReagent
     public Guid ReagentId { get; set; }
     public string? ReagentName { get; set; }
 }
+
+// === Incertidumbre de Medida (ISO 15189 §6.5, 7.3.4) ===
+
+public class MeasurementUncertainty
+{
+    public Guid Id { get; set; }
+    public Guid MethodId { get; set; }
+    public string AnalyteName { get; set; } = string.Empty;
+    public double Value { get; set; }
+    public string Unit { get; set; } = string.Empty;
+    public double CoverageFactor { get; set; } = 2.0;
+    public string ConfidenceLevel { get; set; } = "95%";
+    public DateTime EstimatedDate { get; set; }
+    public string? Notes { get; set; }
+}

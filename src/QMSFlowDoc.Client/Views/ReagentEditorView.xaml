@@ -24,12 +24,15 @@
                 <TextBox x:Name="InternalCodeBox" Header="Código Interno" PlaceholderText="REA-001" Grid.Row="1" Grid.Column="1" />
                 
                 <TextBox x:Name="ManufacturerBox" Header="Fabricante" PlaceholderText="Sigma-Aldrich, etc." Grid.Row="2" Grid.Column="0" />
-                <ComboBox x:Name="TypeCombo" Header="Tipo de Reactivo" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch">
-                    <ComboBoxItem Content="Químico" IsSelected="True" />
-                    <ComboBoxItem Content="Biológico" />
-                    <ComboBoxItem Content="Kit de Diagnóstico" />
-                    <ComboBoxItem Content="Consumible" />
-                </ComboBox>
+                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="8">
+                    <TextBlock Text="Tipo de Reactivo" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlPageTextBaseMediumBrush}"/>
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <ComboBox x:Name="TypeCombo" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="1" Click="ManageTypes_Click" ToolTipService.ToolTip="Gestionar tipos">
+                            <FontIcon Glyph="&#xE713;" FontSize="14" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
                 
                 <ComboBox x:Name="StatusCombo" Header="Estado" Grid.Row="3" Grid.Column="0" HorizontalAlignment="Stretch">
                     <ComboBoxItem Content="ACTIVO" IsSelected="True" />

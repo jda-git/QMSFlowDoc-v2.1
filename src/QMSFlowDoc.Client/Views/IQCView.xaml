@@ -1,0 +1,68 @@
+<Page
+    x:Class="QMSFlowDoc.Client.Views.IQCView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dto="using:QMSFlowDoc.Shared.DTOs"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid Padding="24" RowDefinitions="Auto, *">
+        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,24">
+            <TextBlock Text="Control Interno de Calidad (IQC)" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+            <Button Content="Registrar Resultado" Style="{StaticResource AccentButtonStyle}" Click="AddIQC_Click" />
+            <ComboBox x:Name="EquipmentFilter" Header="Equipo" PlaceholderText="Todos" SelectionChanged="Filter_Changed" MinWidth="150" VerticalAlignment="Bottom" />
+            <ComboBox x:Name="AnalyteFilter" Header="Analito" PlaceholderText="Todos" SelectionChanged="Filter_Changed" MinWidth="150" VerticalAlignment="Bottom" />
+        </StackPanel>
+
+        <ListView Grid.Row="1" x:Name="IQCList"
+                  ItemsSource="{x:Bind Results, Mode=OneWay}"
+                  SelectionMode="None">
+            <ListView.HeaderTemplate>
+                <DataTemplate>
+                    <Grid Padding="12,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Fecha" FontWeight="Bold" Grid.Column="0" />
+                        <TextBlock Text="Equipo" FontWeight="Bold" Grid.Column="1" />
+                        <TextBlock Text="Analito" FontWeight="Bold" Grid.Column="2" />
+                        <TextBlock Text="Nivel" FontWeight="Bold" Grid.Column="3" />
+                        <TextBlock Text="Valor" FontWeight="Bold" Grid.Column="4" />
+                        <TextBlock Text="Estado" FontWeight="Bold" Grid.Column="5" />
+                        <TextBlock Text="Regla Westgard" FontWeight="Bold" Grid.Column="6" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.HeaderTemplate>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="dto:IQCListDto">
+                    <Grid Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind Date.ToString()}" Grid.Column="0" />
+                        <TextBlock Text="{x:Bind EquipmentName}" Grid.Column="1" />
+                        <TextBlock Text="{x:Bind AnalyteName}" Grid.Column="2" />
+                        <TextBlock Text="{x:Bind Level}" Grid.Column="3" />
+                        <TextBlock Text="{x:Bind Value}" Grid.Column="4" />
+                        <TextBlock Text="{x:Bind Status.ToString()}" Grid.Column="5" />
+                        <TextBlock Text="{x:Bind WestgardRule}" Grid.Column="6" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</Page>

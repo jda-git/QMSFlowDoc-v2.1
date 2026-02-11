@@ -13,7 +13,7 @@ namespace QMSFlowDoc.Client.Views
 {
     public sealed partial class EQARoundDetailsView : Page
     {
-        private readonly IEQAService _eqaService;
+        private readonly IEQAService _eqaService = null!;
         private Guid _roundId;
         private EQARoundDto? _round;
         private ObservableCollection<EQARoundResultDto> _results = new ObservableCollection<EQARoundResultDto>();

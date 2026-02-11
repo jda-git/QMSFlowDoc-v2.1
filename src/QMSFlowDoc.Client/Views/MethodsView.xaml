@@ -262,6 +262,33 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Visibility="Collapsed" />
                      </Grid>
                 </PivotItem>
+
+                <PivotItem Header="Incertidumbre de Medida">
+                    <Grid Padding="24">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                            <TextBlock Text="Registros de Incertidumbre (ISO 15189 §6.5)" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                            <Button Click="AddUncertainty_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE9D2;" FontSize="16" />
+                                    <TextBlock Text="Registrar Incertidumbre" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <ListView x:Name="UncertaintiesList" Grid.Row="1" SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+                        <TextBlock x:Name="EmptyUncertaintiesText" Grid.Row="1" Text="No hay registros de incertidumbre para este método."
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Visibility="Collapsed" />
+                    </Grid>
+                </PivotItem>
             </Pivot>
         </Grid>
 

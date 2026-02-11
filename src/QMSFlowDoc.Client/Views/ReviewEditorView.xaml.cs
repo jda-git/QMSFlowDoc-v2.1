@@ -3,8 +3,10 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using QMSFlowDoc.Shared.DTOs;
 using QMSFlowDoc.Shared.Models;
+using QMSFlowDoc.Client.Services;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using Windows.Storage.Pickers;
 using System.IO;
 
@@ -48,66 +50,69 @@ public sealed partial class ReviewEditorView : Page
                 // Refresh connection status
                 await docService.InitializeAsync();
 
-                if (docService.IsLocalMode)
-                {
-                    FileNameText.Text = "Error: Modo Offline no permite vincular documentos a Revisión Online.";
-                    return;
-                }
+                // Removed explicit LocalMode check
 
+
+                // 1. Fetch Document Types
                 // 1. Fetch Document Types
                 var typeList = await docService.GetDocumentTypesAsync();
                 var reportType = typeList.FirstOrDefault(t => t.Name == "Reporte") ?? typeList.FirstOrDefault();
-                
-                if (reportType == null) throw new Exception("No se encontraron tipos de documentos configurados.");
 
-                // Lookup Folder
-                var folderId = await docService.GetOrCreateFolderIdAsync("AUDITORIA"); 
+                // 2. Prepare Folder Name (flat REVISION DIRECCION folder)
+                var folderName = "REVISION DIRECCION";
                 
-                if (folderId == null)
-                {
-                    FileNameText.Text = "Error: No se pudo crear/encontrar la carpeta 'AUDITORIA'.";
-                    return;
-                }
+                // 3. Prepare filename as MM-YYYY-Acta_Revision.pdf
+                var date = ReviewDatePicker.Date;
+                var datePrefix = $"{date.Month:D2}-{date.Year}";
+                var safeName = $"{datePrefix}-Acta_Revision_Direccion.pdf";
+                
+                // 4. Read File
+                using var stream = await file.OpenStreamForReadAsync();
+                var bytes = new byte[stream.Length];
+                await stream.ReadAsync(bytes, 0, bytes.Length);
 
-                var createReq = new CreateDocumentRequest(
-                   DocCode: "REV-" + DateTime.Now.Ticks.ToString().Substring(10),
-                   Title: $"Acta Revisión {ReviewDatePicker.Date.Year}",
-                   DocumentTypeId: reportType.Id,
-                   FolderId: folderId, 
-                   Area: "Management",
-                   Process: "Review",
-                   Status: DocumentStatus.APPROVED,
-                   ReviewIntervalMonths: 12,
-                   VersionLabel: "v1.0"
+                // 5. Create directly
+                var doc = await docService.CreateDocumentWithFileAsync(
+                   docCode: $"REV-{datePrefix}-{DateTime.Now.Ticks.ToString().Substring(12)}",
+                   title: $"Acta Revisión Dirección {datePrefix}",
+                   status: DocumentStatus.APPROVED,
+                   documentTypeId: reportType?.Id,
+                   reviewIntervalMonths: 12,
+                   versionLabel: "v1.0",
+                   area: "Management",
+                   process: "Review",
+                   fileBytes: bytes,
+                   fileName: safeName,
+                   subFolderName: folderName
                 );
                 
-                var doc = await docService.CreateDocumentAsync(createReq);
                 if (doc != null)
                 {
-                    using var stream = await file.OpenStreamForReadAsync();
-                    var bytes = new byte[stream.Length];
-                    await stream.ReadAsync(bytes, 0, bytes.Length);
+                    _minutesDocumentId = doc.Id;
+                    FileNameText.Text = file.Name;
                     
-                    var success = await docService.UploadFileAsync(doc.Id, bytes, file.Name, file.ContentType);
-                    if (success) 
+                    // Auto-save the link
+                    if (_reviewId.HasValue)
                     {
-                        _minutesDocumentId = doc.Id;
-                        FileNameText.Text = file.Name;
-                        
-                        // Auto-save hint
-                        if (_reviewId.HasValue)
-                        {
-                             FileNameText.Text = $"{file.Name} (Vinculado - Recuerde Guardar)";
+                        try {
+                            var updateReq = new CreateManagementReviewRequest(
+                                ReviewDatePicker.Date.UtcDateTime,
+                                ParticipantsBox.Text,
+                                AgendaBox.Text,
+                                SummaryBox.Text,
+                                ActionsBox.Text,
+                                _minutesDocumentId
+                            );
+                            await ((App)Application.Current).ImprovementService.UpdateReviewAsync(_reviewId.Value, updateReq);
+                            FileNameText.Text = $"{file.Name} (Guardado)";
+                        } catch {
+                            FileNameText.Text = $"{file.Name} (Vinculado - Recuerde Guardar)";
                         }
-                    }
-                    else
-                    {
-                        FileNameText.Text = "Error al subir contenido al servidor.";
                     }
                 }
                 else
                 {
-                    FileNameText.Text = "Error: El servidor rechazó la creación del documento.";
+                    FileNameText.Text = "Error: El sistema no pudo crear el documento.";
                 }
             }
             catch (Exception ex)
@@ -122,10 +127,49 @@ public sealed partial class ReviewEditorView : Page
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        await LoadAnnualSummaryAsync();
         if (e.Parameter is Guid id)
         {
             _reviewId = id;
             await LoadReview(id);
+        }
+    }
+
+    private async System.Threading.Tasks.Task LoadAnnualSummaryAsync()
+    {
+        try
+        {
+            var dashboardService = ((App)Application.Current).DashboardService;
+            var data = await dashboardService.GetDashboardDataAsync();
+            if (data?.Stats != null)
+            {
+                var s = data.Stats;
+                SummaryNC.Text = $"NC pendientes revisión: {s.PendingReviewDocs} | Aprobación: {s.PendingApprovalDocs}";
+                SummaryRisks.Text = $"Riesgos altos activos: {s.OpenHighRisks}";
+                SummaryEQA.Text = $"EQA activos: {s.ActiveEQAPrograms} | Pendientes: {s.PendingEQAResults}";
+                SummaryCompetencies.Text = $"Competencias vencidas: {s.ExpiredCompetencies} | Formaciones pend.: {s.PendingTrainings}";
+                SummaryDocs.Text = $"Documentos totales: {s.TotalDocuments}";
+                SummaryEquipment.Text = $"Mtto. equipos vencido: {s.DueEquipmentMaintenance}";
+            }
+
+            // Also load audit/risk counts for the consolidated view
+            var improvService = ((App)Application.Current).ImprovementService;
+            var audits = await improvService.GetAuditsAsync();
+            var auditList = audits.ToList();
+            int completed = auditList.Count(a => a.Status == AuditStatus.COMPLETED);
+            int totalFindings = auditList.Sum(a => a.FindingCount);
+            SummaryAudits.Text = $"Auditorías completadas: {completed}/{auditList.Count} | Hallazgos: {totalFindings}";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading summary: {ex.Message}");
+            SummaryNC.Text = "No conformidades: datos no disponibles";
+            SummaryRisks.Text = "Riesgos: datos no disponibles";
+            SummaryAudits.Text = "Auditorías: datos no disponibles";
+            SummaryEQA.Text = "EQA: datos no disponibles";
+            SummaryCompetencies.Text = "Competencias: datos no disponibles";
+            SummaryDocs.Text = "Documentos: datos no disponibles";
+            SummaryEquipment.Text = "Equipos: datos no disponibles";
         }
     }
 

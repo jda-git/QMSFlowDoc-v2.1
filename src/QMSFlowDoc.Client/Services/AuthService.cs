@@ -171,13 +171,38 @@ public class AuthService : IAuthService
         {
             return await _httpClient.GetFromJsonAsync<bool>("auth/needs-bootstrap");
         }
-        catch { return false; }
+        catch
+        {
+            // API not available — check local database
+            try
+            {
+                var store = await GetLocalStoreAsync();
+                var hasUsers = await store.HasAnyUsersAsync();
+                return !hasUsers; // needs bootstrap if no users exist
+            }
+            catch { return false; }
+        }
     }
 
     public async Task<bool> BootstrapAsync(RegisterRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("auth/bootstrap", request);
-        return response.IsSuccessStatusCode;
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("auth/bootstrap", request);
+            if (response.IsSuccessStatusCode) return true;
+        }
+        catch { /* API not available, fall through to local */ }
+
+        // Local bootstrap: create admin user directly in SQLite
+        try
+        {
+            var store = await GetLocalStoreAsync();
+            var userId = await store.CreateUserAsync(
+                request.Username, request.Password,
+                request.FullName, request.Email, request.RoleName);
+            return userId != Guid.Empty;
+        }
+        catch { return false; }
     }
 
     public void Logout()

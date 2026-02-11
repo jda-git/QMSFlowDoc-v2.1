@@ -26,12 +26,13 @@ public partial class App : Application
     public Services.ITrainingService TrainingService { get; }
     public Services.ICompetencyService CompetencyService { get; }
     public Services.IAuthorizationService AuthorizationService { get; }
+    public Services.IPermissionsService PermissionsService { get; }
     public Services.IPrintingService PrintingService { get; } = new Services.PrintingService();
     
     // Sync Infrastructure
     public Services.Sync.SnapshotStore SnapshotStore { get; }
-    public Services.Sync.GoogleDriveProvider DriveProvider { get; }
-    public Services.Sync.SyncEngine DriveSyncEngine { get; }
+    // public Services.Sync.GoogleDriveProvider DriveProvider { get; }
+    // public Services.Sync.SyncEngine DriveSyncEngine { get; }
     public Services.Sync.SyncLogger SyncLogger { get; }
     public Services.Sync.AuditLogger AuditLogger { get; }
     
@@ -53,6 +54,7 @@ public partial class App : Application
     public Services.IEQAService EQAService { get; }
     public Services.IMethodService MethodService { get; }
     public Services.IExportService ExportService { get; }
+    public Services.ISupplierService SupplierService { get; }
 
     public static Microsoft.UI.Xaml.Window? MainWindowInstance { get; set; }
 
@@ -93,6 +95,8 @@ public partial class App : Application
         ExportService = new Services.ExportService();
         EquipmentAuditLogger = new Services.AuditLogger(ConfigurationService, NetworkConfigStore);
         AuditService = new Services.AuditService(LocalStore); // Initialize AuditService
+        SupplierService = new Services.SupplierService(LocalStore); // ISO 15189:2022 Section 6.8
+        PermissionsService = new Services.PermissionsService(LocalStore);
 
         // Register in shim
         var services = new ServiceCollection();
@@ -105,14 +109,14 @@ public partial class App : Application
         
         // Init Sync Infrastructure
         SnapshotStore = new Services.Sync.SnapshotStore();
-        DriveProvider = new Services.Sync.GoogleDriveProvider();
+        // REMOVED: Google Drive Provider & Sync Engine (User Request: Local Network Master only)
         SyncLogger = new Services.Sync.SyncLogger();
         AuditLogger = new Services.Sync.AuditLogger();
         
         var localDocsPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QMSFlowDoc", "Files");
         var localDbPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QMSFlowDoc");
         
-        DriveSyncEngine = new Services.Sync.SyncEngine(SnapshotStore, DriveProvider, SyncLogger, AuditLogger, localDocsPath);
+        // DriveSyncEngine removed.
         
         NetworkSyncService = new Services.Sync.NetworkSyncService(NetworkConfigStore, localDbPath, localDocsPath);
         SyncAgent = new Services.SyncAgent(NetworkSyncService);
@@ -144,6 +148,7 @@ public partial class App : Application
             
             // Initialize Core Store explicitly
             await LocalStore.InitializeAsync();
+            await PermissionsService.EnsureSeedDataAsync();
 
             // Initialize LocalDocumentStore if using local mode
             // Initialize LocalDocumentStore via Service (explicit call)

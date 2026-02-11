@@ -16,9 +16,15 @@ public sealed partial class CompetencyAuthView : Page
         this.InitializeComponent();
     }
 
-    private async void Page_Loaded(object sender, RoutedEventArgs e)
+    protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
+        base.OnNavigatedTo(e);
         await LoadData();
+    }
+
+    private void Page_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Handled by OnNavigatedTo to ensure auto-load
     }
 
     private async Task LoadData()

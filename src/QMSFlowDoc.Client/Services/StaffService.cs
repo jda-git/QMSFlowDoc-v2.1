@@ -21,6 +21,7 @@ public interface IStaffService
     Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request);
     Task<IEnumerable<GlobalTrainingDto>> GetAllTrainingsAsync(string? staffName = null, string? competencyName = null, DateTime? fromDate = null, DateTime? toDate = null);
     Task<CompetencyEvaluation?> AssessCompetencyAsync(AssessCompetencyRequest request);
+    Task<string?> GetDocumentBasePathAsync();
 }
 
 public class StaffService : IStaffService
@@ -140,8 +141,42 @@ public class StaffService : IStaffService
         }
     }
 
+    public async Task<string?> GetDocumentBasePathAsync()
+    {
+        var store = await GetLocalStoreAsync();
+        return await store.GetBaseDocumentPathAsync();
+    }
+
     public async Task<bool> RegisterTrainingAsync(RegisterTrainingRequest request)
     {
+        // Handle File Copy locally
+        string? finalRelativePath = null;
+        if (!string.IsNullOrEmpty(request.SourceCertificatePath))
+        {
+            try
+            {
+                var store = await GetLocalStoreAsync();
+                var basePath = await store.GetBaseDocumentPathAsync();
+                if (basePath != null)
+                {
+                    var destDir = System.IO.Path.Combine(basePath, "personal", request.StaffId.ToString(), "certificados");
+                    System.IO.Directory.CreateDirectory(destDir);
+                    var fileName = System.IO.Path.GetFileName(request.SourceCertificatePath);
+                    var fullDest = System.IO.Path.Combine(destDir, fileName);
+                    System.IO.File.Copy(request.SourceCertificatePath, fullDest, true);
+                    
+                    // Store relative path using forward slashes for cross-platform compatibility if needed
+                    finalRelativePath = $"personal/{request.StaffId}/certificados/{fileName}";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error copying certificate: {ex.Message}");
+                // Proceed without file? Or fail? 
+                // Proceeding allows data entry even if file fails.
+            }
+        }
+
         try
         {
             var response = await _httpClient.PostAsJsonAsync("staff/training", request);
@@ -150,13 +185,37 @@ public class StaffService : IStaffService
         catch
         {
             var store = await GetLocalStoreAsync();
-            await store.RegisterTrainingAsync(request);
+            await store.RegisterTrainingAsync(request, finalRelativePath);
             return true;
         }
     }
 
     public async Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request)
     {
+         string? finalRelativePath = null;
+        if (!string.IsNullOrEmpty(request.SourceCertificatePath))
+        {
+            try
+            {
+                var store = await GetLocalStoreAsync();
+                var basePath = await store.GetBaseDocumentPathAsync();
+                if (basePath != null)
+                {
+                    var destDir = System.IO.Path.Combine(basePath, "personal", request.StaffId.ToString(), "certificados");
+                    System.IO.Directory.CreateDirectory(destDir);
+                    var fileName = System.IO.Path.GetFileName(request.SourceCertificatePath);
+                    var fullDest = System.IO.Path.Combine(destDir, fileName);
+                    System.IO.File.Copy(request.SourceCertificatePath, fullDest, true);
+                    
+                    finalRelativePath = $"personal/{request.StaffId}/certificados/{fileName}";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error copying certificate: {ex.Message}");
+            }
+        }
+
         try
         {
             var response = await _httpClient.PutAsJsonAsync($"staff/training/{request.Id}", request);
@@ -165,23 +224,15 @@ public class StaffService : IStaffService
         catch
         {
             var store = await GetLocalStoreAsync();
-            return await store.UpdateTrainingAsync(request);
+            return await store.UpdateTrainingAsync(request, finalRelativePath);
         }
     }
 
     public async Task<IEnumerable<GlobalTrainingDto>> GetAllTrainingsAsync(string? staffName = null, string? competencyName = null, DateTime? fromDate = null, DateTime? toDate = null)
     {
-        try
-        {
-            // Try HTTP if API exists (future proofing), but for now fallback to Local
-            // If we implement API later, we'd add query params here.
-            throw new NotImplementedException(); // Force fallback
-        }
-        catch
-        {
-            var store = await GetLocalStoreAsync();
-            return await store.GetAllTrainingsAsync(staffName, competencyName, fromDate, toDate);
-        }
+        // Local-first: use local store directly (API integration reserved for future)
+        var store = await GetLocalStoreAsync();
+        return await store.GetAllTrainingsAsync(staffName, competencyName, fromDate, toDate);
     }
 
     public async Task<bool> DeleteTrainingAsync(Guid trainingId)

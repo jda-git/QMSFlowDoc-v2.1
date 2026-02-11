@@ -89,6 +89,7 @@ public sealed partial class MethodsView : Page
 
             await LoadAuthorizationsAsync(method.Id);
             await LoadVersionsAsync(method.Id);
+            await LoadUncertaintiesAsync(method.Id);
         }
         else
         {
@@ -385,7 +386,7 @@ public sealed partial class MethodsView : Page
 
         var dialog = new ContentDialog
         {
-            Title = "Registrar Validación",
+            Title = "Registrar Validación (ISO 15189)",
             PrimaryButtonText = "Guardar",
             CloseButtonText = "Cancelar",
             DefaultButton = ContentDialogButton.Primary,
@@ -393,23 +394,62 @@ public sealed partial class MethodsView : Page
         };
 
         var stack = new StackPanel { Spacing = 12 };
-        var paramBox = new TextBox { Header = "Parámetro Validado", PlaceholderText = "Precisión, Exactitud, Linealidad..." };
+
+        // ISO 15189 predefined validation parameters
+        var paramCombo = new ComboBox { Header = "Parámetro ISO 15189", HorizontalAlignment = HorizontalAlignment.Stretch };
+        var isoParams = new[]
+        {
+            "Precisión — Repetibilidad (CV%)",
+            "Precisión — Reproducibilidad (CV%)",
+            "Veracidad / Sesgo (Bias %)",
+            "Límite de Detección (LOD)",
+            "Límite de Cuantificación (LOQ)",
+            "Linealidad (R²)",
+            "Incertidumbre de Medida (MU)",
+            "Carry-over / Arrastre",
+            "Estabilidad de Muestra",
+            "Interferencias",
+            "Comparación de Métodos",
+            "Robustez",
+            "Otro (personalizado)"
+        };
+        foreach (var p in isoParams) paramCombo.Items.Add(p);
+        paramCombo.SelectedIndex = 0;
+
+        var customParamBox = new TextBox 
+        { 
+            Header = "Parámetro personalizado", 
+            PlaceholderText = "Especifique el parámetro...",
+            Visibility = Visibility.Collapsed 
+        };
+        paramCombo.SelectionChanged += (s, args) =>
+        {
+            customParamBox.Visibility = paramCombo.SelectedIndex == isoParams.Length - 1 
+                ? Visibility.Visible 
+                : Visibility.Collapsed;
+        };
+
         var resBox = new TextBox { Header = "Resultado / Conclusión", PlaceholderText = "Cumple con las especificaciones...", AcceptsReturn = true, Height = 60 };
         var countBox = new NumberBox { Header = "Nº de Experimentos", Value = 1, Minimum = 1, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
 
-        stack.Children.Add(paramBox);
+        stack.Children.Add(paramCombo);
+        stack.Children.Add(customParamBox);
         stack.Children.Add(resBox);
         stack.Children.Add(countBox);
         dialog.Content = stack;
 
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
-            if (string.IsNullOrWhiteSpace(paramBox.Text)) return;
+            string selectedParam = paramCombo.SelectedIndex == isoParams.Length - 1
+                ? customParamBox.Text
+                : paramCombo.SelectedItem?.ToString() ?? "";
+
+            if (string.IsNullOrWhiteSpace(selectedParam)) return;
 
             var val = new MethodValidationDto(
                 Guid.NewGuid(), 
                 targetVersion.Id, 
-                paramBox.Text, 
+                selectedParam, 
                 resBox.Text, 
                 (int)countBox.Value, 
                 null, 
@@ -440,6 +480,115 @@ public sealed partial class MethodsView : Page
                 };
                 await dialog.ShowAsync();
             }
+        }
+    }
+
+    private async System.Threading.Tasks.Task LoadUncertaintiesAsync(Guid methodId)
+    {
+        try
+        {
+            var store = ((App)Application.Current).LocalStore;
+            var uncertainties = await store.GetUncertaintiesAsync(methodId);
+            UncertaintiesList.Items.Clear();
+
+            if (uncertainties.Count == 0)
+            {
+                EmptyUncertaintiesText.Visibility = Visibility.Visible;
+                UncertaintiesList.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            EmptyUncertaintiesText.Visibility = Visibility.Collapsed;
+            UncertaintiesList.Visibility = Visibility.Visible;
+
+            foreach (var u in uncertainties)
+            {
+                var grid = new Grid { Padding = new Thickness(12, 8, 12, 8), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(20, 0, 120, 215)), Margin = new Thickness(0, 4, 0, 0), CornerRadius = new CornerRadius(4) };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var analyteText = new TextBlock { Text = u.AnalyteName, FontWeight = Microsoft.UI.Text.FontWeights.Bold };
+                Grid.SetColumn(analyteText, 0);
+                grid.Children.Add(analyteText);
+
+                var valueText = new TextBlock { Text = $"\u00b1 {u.Value} {u.Unit}" };
+                Grid.SetColumn(valueText, 1);
+                grid.Children.Add(valueText);
+
+                var kText = new TextBlock { Text = $"k={u.CoverageFactor}", Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray) };
+                Grid.SetColumn(kText, 2);
+                grid.Children.Add(kText);
+
+                var confText = new TextBlock { Text = u.ConfidenceLevel, Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray) };
+                Grid.SetColumn(confText, 3);
+                grid.Children.Add(confText);
+
+                var dateText = new TextBlock { Text = u.EstimatedDate.ToString("d"), Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray) };
+                Grid.SetColumn(dateText, 4);
+                grid.Children.Add(dateText);
+
+                UncertaintiesList.Items.Add(new ListViewItem { Content = grid, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading uncertainties: {ex.Message}");
+        }
+    }
+
+    private async void AddUncertainty_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMethod == null) return;
+
+        var stack = new StackPanel { Spacing = 10 };
+        var analyteBox = new TextBox { Header = "Analito/Mensurando", PlaceholderText = "Ej: Glucosa" };
+        var valueBox = new NumberBox { Header = "Valor de Incertidumbre", SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
+        var unitBox = new TextBox { Header = "Unidad", PlaceholderText = "Ej: mg/dL, mmol/L, %" };
+        var kBox = new NumberBox { Header = "Factor de Cobertura (k)", Value = 2.0, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
+        var confBox = new ComboBox { Header = "Nivel de Confianza", Items = { "95%", "99%", "99.7%" }, SelectedIndex = 0 };
+        var notesBox = new TextBox { Header = "Notas (Opcional)", PlaceholderText = "Método de estimación, fuentes de incertidumbre..." };
+
+        stack.Children.Add(analyteBox);
+        stack.Children.Add(valueBox);
+        stack.Children.Add(unitBox);
+        stack.Children.Add(kBox);
+        stack.Children.Add(confBox);
+        stack.Children.Add(notesBox);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Registrar Incertidumbre de Medida",
+            Content = new ScrollViewer { Content = stack, MaxHeight = 400 },
+            PrimaryButtonText = "Registrar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            if (string.IsNullOrWhiteSpace(analyteBox.Text) || string.IsNullOrWhiteSpace(unitBox.Text))
+            {
+                var errDlg = new ContentDialog { Title = "Error", Content = "Analito y Unidad son obligatorios.", CloseButtonText = "OK", XamlRoot = this.XamlRoot };
+                await errDlg.ShowAsync();
+                return;
+            }
+
+            var store = ((App)Application.Current).LocalStore;
+            await store.CreateUncertaintyAsync(
+                _selectedMethod.Id,
+                analyteBox.Text.Trim(),
+                valueBox.Value,
+                unitBox.Text.Trim(),
+                kBox.Value,
+                (confBox.SelectedItem as string) ?? "95%",
+                string.IsNullOrWhiteSpace(notesBox.Text) ? null : notesBox.Text
+            );
+
+            await LoadUncertaintiesAsync(_selectedMethod.Id);
         }
     }
 }

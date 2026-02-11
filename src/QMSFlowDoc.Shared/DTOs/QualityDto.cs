@@ -44,3 +44,24 @@ public record CreateCAPARequest(
     DateTime? DueDate
 );
 
+// === Quejas / Complaints DTOs ===
+
+public class ComplaintListDto
+{
+    public Guid Id { get; set; }
+    public DateTime Date { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public ComplaintCategory Category { get; set; }
+    public ComplaintStatus Status { get; set; }
+
+    public ComplaintListDto() { }
+}
+
+public record CreateComplaintRequest(
+    string Source,
+    string Description,
+    ComplaintCategory Category,
+    string? InvestigationResult,
+    string? CorrectiveAction
+);

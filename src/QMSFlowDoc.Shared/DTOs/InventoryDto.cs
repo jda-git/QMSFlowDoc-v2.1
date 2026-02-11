@@ -104,3 +104,84 @@ public record InventoryMovementDto(
     DateTime? ExpiryDate,
     string Reason
 );
+
+// ==================== SUPPLIER DTOs (ISO 15189:2022 Section 6.8) ====================
+
+public class SupplierListDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public SupplierType Type { get; set; }
+    public SupplierQualityStatus QualityStatus { get; set; }
+    public DateTime? LastEvaluationDate { get; set; }
+    public DateTime? NextEvaluationDate { get; set; }
+    public int EvaluationCount { get; set; }
+    public int IncidentCount { get; set; }
+    
+    public SupplierListDto() { }
+    public SupplierListDto(Guid id, string name, SupplierType type, SupplierQualityStatus status, 
+        DateTime? lastEval, DateTime? nextEval, int evalCount, int incidentCount)
+    {
+        Id = id; Name = name; Type = type; QualityStatus = status;
+        LastEvaluationDate = lastEval; NextEvaluationDate = nextEval;
+        EvaluationCount = evalCount; IncidentCount = incidentCount;
+    }
+}
+
+public class SupplierDetailDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? ContactName { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? Address { get; set; }
+    public string? Notes { get; set; }
+    public SupplierType Type { get; set; }
+    public SupplierQualityStatus QualityStatus { get; set; }
+    public DateTime? LastEvaluationDate { get; set; }
+    public DateTime? NextEvaluationDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public List<SupplierEvaluationDto> Evaluations { get; set; } = new();
+}
+
+public class SupplierEvaluationDto
+{
+    public Guid Id { get; set; }
+    public Guid SupplierId { get; set; }
+    public DateTime EvaluationDate { get; set; }
+    public string? EvaluatorName { get; set; }
+    public string EvaluatedPeriod { get; set; } = string.Empty;
+    public int ScorePlazos { get; set; }
+    public int ScoreCalidad { get; set; }
+    public int ScoreServicio { get; set; }
+    public int ScoreIncidencias { get; set; }
+    public double AverageScore => (ScorePlazos + ScoreCalidad + ScoreServicio + ScoreIncidencias) / 4.0;
+    public bool IsApproved { get; set; }
+    public string? Observations { get; set; }
+    public string? AttachmentPath { get; set; }
+}
+
+public record CreateSupplierRequest(
+    string Name,
+    string? ContactName,
+    string? Email,
+    string? Phone,
+    string? Address,
+    string? Notes,
+    SupplierType Type
+);
+
+public record CreateSupplierEvaluationRequest(
+    Guid SupplierId,
+    DateTime EvaluationDate,
+    string EvaluatedPeriod,
+    int ScorePlazos,
+    int ScoreCalidad,
+    int ScoreServicio,
+    int ScoreIncidencias,
+    bool IsApproved,
+    string? Observations,
+    string? AttachmentPath
+);
+

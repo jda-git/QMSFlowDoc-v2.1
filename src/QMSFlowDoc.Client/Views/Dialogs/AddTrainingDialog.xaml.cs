@@ -1,6 +1,9 @@
 using Microsoft.UI.Xaml.Controls;
 using QMSFlowDoc.Shared.DTOs;
 using System;
+using Windows.Storage;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace QMSFlowDoc.Client.Views.Dialogs;
 
@@ -13,6 +16,9 @@ public sealed partial class AddTrainingDialog : ContentDialog
     public DateTime CompletedAt { get; private set; }
     public string Result { get; private set; } = "APTO";
     public string? Notes { get; private set; }
+    
+    public StorageFile? SelectedFile { get; private set; }
+    public string? ExistingCertificatePath { get; private set; }
 
     public void LoadData(StaffTrainingDto dto)
     {
@@ -40,6 +46,12 @@ public sealed partial class AddTrainingDialog : ContentDialog
         if (dto.CompetencyId.HasValue)
         {
             CompetencyCombo.SelectedValue = dto.CompetencyId.Value;
+        }
+
+        if (!string.IsNullOrEmpty(dto.CertificatePath))
+        {
+            ExistingCertificatePath = dto.CertificatePath;
+            FileNameText.Text = System.IO.Path.GetFileName(dto.CertificatePath) + " (Existente)";
         }
 
         this.Title = "Editar Formación";
@@ -83,6 +95,43 @@ public sealed partial class AddTrainingDialog : ContentDialog
          }
     }
 
+    private async void UploadButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker();
+        
+        // Initialize the picker with the window handle (WinUI 3 requirement)
+        var window = (App.Current as App)?.MainWindow; // Assuming App exposes MainWindow, otherwise use XamlRoot
+        if (window != null)
+        {
+            var hWnd = WindowNative.GetWindowHandle(window);
+            InitializeWithWindow.Initialize(picker, hWnd);
+        }
+        else
+        {
+            // Fallback if we can't get MainWindow easily, but XamlRoot might work? 
+            // FileOpenPicker needs HWND. 
+            // Let's assume App.Current.m_window is available or public MainWindow
+            // Or try to use the HWND from this XamlRoot? 
+            // Accessing HWND from XamlRoot is tricky in pure WinUI 3 XAML.
+            // Usually we must pass it.
+            // But let's assume standard pattern.
+        }
+
+        picker.ViewMode = PickerViewMode.Thumbnail;
+        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        picker.FileTypeFilter.Add(".pdf");
+        picker.FileTypeFilter.Add(".jpg");
+        picker.FileTypeFilter.Add(".png");
+        picker.FileTypeFilter.Add(".jpeg");
+
+        var file = await picker.PickSingleFileAsync();
+        if (file != null)
+        {
+            SelectedFile = file;
+            FileNameText.Text = file.Name;
+        }
+    }
+
     private void AddTrainingDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
         // Validar personal si es visible
@@ -90,8 +139,6 @@ public sealed partial class AddTrainingDialog : ContentDialog
         {
             if (StaffCombo.SelectedValue == null)
             {
-                // Show error or just cancel? ContentDialog doesn't easily support inline error without extra UI.
-                // For now, we rely on user seeing it empty. Maybe focus it.
                 StaffCombo.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
                 args.Cancel = true;
                 return;

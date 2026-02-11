@@ -67,3 +67,21 @@ public class CapaAction
     public string? EffectivenessCheck { get; set; }
     public CAPAStatus Status { get; set; } = CAPAStatus.OPEN;
 }
+
+// === Quejas y Reclamaciones (ISO 15189 §7.7) ===
+
+public enum ComplaintStatus { OPEN, INVESTIGATING, CLOSED }
+public enum ComplaintCategory { PATIENT, CLINICAL, TURNAROUND, REPORT_ERROR, OTHER }
+
+public class Complaint
+{
+    public Guid Id { get; set; }
+    public DateTime Date { get; set; }
+    public string Source { get; set; } = string.Empty; // Who filed it
+    public string Description { get; set; } = string.Empty;
+    public ComplaintCategory Category { get; set; } = ComplaintCategory.OTHER;
+    public string? InvestigationResult { get; set; }
+    public string? CorrectiveAction { get; set; }
+    public ComplaintStatus Status { get; set; } = ComplaintStatus.OPEN;
+    public DateTime? ClosedAt { get; set; }
+}

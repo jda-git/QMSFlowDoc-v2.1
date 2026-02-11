@@ -106,7 +106,8 @@ public sealed partial class CompetencyTrainingView : Page
                 dialog.CompletedAt,
                 dialog.Result,
                 dialog.Notes,
-                dialog.SelectedCompetencyId
+                dialog.SelectedCompetencyId,
+                dialog.SelectedFile?.Path // Pass source path
             );
 
             bool success = await app.StaffService.RegisterTrainingAsync(req);
@@ -157,7 +158,8 @@ public sealed partial class CompetencyTrainingView : Page
                  dto.CompletionDate,
                  dto.Hours,
                  dto.Result,
-                 dto.CompetencyId
+                 dto.CompetencyId,
+                 dto.CertificatePath // Pass existing path
              );
              
              dialog.LoadData(staffDto);
@@ -174,7 +176,8 @@ public sealed partial class CompetencyTrainingView : Page
                       dialog.CompletedAt,
                       dialog.Result,
                       dialog.Notes,
-                      dialog.SelectedCompetencyId
+                      dialog.SelectedCompetencyId,
+                      dialog.SelectedFile?.Path // Pass source path
                   );
                   
                   bool success = await app.StaffService.UpdateTrainingAsync(req);
@@ -230,6 +233,54 @@ public sealed partial class CompetencyTrainingView : Page
                  {
                       // Error msg
                  }
+            }
+        }
+    }
+
+    private async void ViewCertificate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is GlobalTrainingDto dto && dto.HasCertificate)
+        {
+            try
+            {
+                var app = (App)Application.Current;
+                var basePath = await app.StaffService.GetDocumentBasePathAsync();
+                if (basePath != null && dto.CertificatePath != null)
+                {
+                    // Handle relative path (personal/...)
+                    var fullPath = System.IO.Path.Combine(basePath, dto.CertificatePath);
+                    
+                    // Normalize separators
+                    fullPath = fullPath.Replace("/", System.IO.Path.DirectorySeparatorChar.ToString());
+
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(fullPath);
+                        await Windows.System.Launcher.LaunchFileAsync(file);
+                    }
+                    else
+                    {
+                        var dialog = new ContentDialog
+                        {
+                            Title = "Archivo no encontrado",
+                            Content = $"No se encontró el archivo en: {fullPath}",
+                            CloseButtonText = "OK",
+                            XamlRoot = this.XamlRoot
+                        };
+                        await dialog.ShowAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                 var dialog = new ContentDialog
+                 {
+                     Title = "Error",
+                     Content = $"No se pudo abrir el certificado: {ex.Message}",
+                     CloseButtonText = "OK",
+                     XamlRoot = this.XamlRoot
+                 };
+                 await dialog.ShowAsync();
             }
         }
     }

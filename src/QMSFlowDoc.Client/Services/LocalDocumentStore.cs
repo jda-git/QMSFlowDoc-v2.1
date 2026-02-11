@@ -139,6 +139,27 @@ public class LocalDocumentStore
                 LastLoginAt TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS Roles (
+                Id TEXT PRIMARY KEY,
+                RoleName TEXT NOT NULL UNIQUE,
+                Description TEXT,
+                CreatedAt TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS Permissions (
+                Id TEXT PRIMARY KEY,
+                PermissionKey TEXT NOT NULL UNIQUE,
+                Description TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS RolePermissions (
+                RoleId TEXT NOT NULL,
+                PermissionId TEXT NOT NULL,
+                PRIMARY KEY (RoleId, PermissionId),
+                FOREIGN KEY (RoleId) REFERENCES Roles(Id) ON DELETE CASCADE,
+                FOREIGN KEY (PermissionId) REFERENCES Permissions(Id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS StaffProfiles (
                 Id TEXT PRIMARY KEY,
                 UserId TEXT,
@@ -338,6 +359,7 @@ public class LocalDocumentStore
                 Score TEXT,
                 CompletionDate TEXT,
                 CertificateDocId TEXT,
+                CertificatePath TEXT,
                 Notes TEXT,
                 Status TEXT,
                 CreatedAt TEXT
@@ -398,7 +420,8 @@ public class LocalDocumentStore
                 LeadAuditor TEXT,
                 Status INTEGER NOT NULL DEFAULT 0,
                 SummaryReport TEXT,
-                ReportDocumentId TEXT
+                ReportDocumentId TEXT,
+                ChecklistJson TEXT
             );
 
             CREATE TABLE IF NOT EXISTS AuditFindings (
@@ -573,11 +596,100 @@ public class LocalDocumentStore
                 UpdatedAt TEXT
             );
 
+            -- ISO 15189:2022 Section 6.8 - Supplier Management
+            CREATE TABLE IF NOT EXISTS Suppliers (
+                Id TEXT PRIMARY KEY,
+                Name TEXT NOT NULL,
+                ContactName TEXT,
+                Email TEXT,
+                Phone TEXT,
+                Address TEXT,
+                Notes TEXT,
+                Type INTEGER NOT NULL DEFAULT 0,
+                QualityStatus INTEGER NOT NULL DEFAULT 0,
+                LastEvaluationDate TEXT,
+                NextEvaluationDate TEXT,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS SupplierEvaluations (
+                Id TEXT PRIMARY KEY,
+                SupplierId TEXT NOT NULL,
+                EvaluationDate TEXT NOT NULL,
+                EvaluatorUserId TEXT,
+                EvaluatedPeriod TEXT,
+                ScorePlazos INTEGER NOT NULL DEFAULT 3,
+                ScoreCalidad INTEGER NOT NULL DEFAULT 3,
+                ScoreServicio INTEGER NOT NULL DEFAULT 3,
+                ScoreIncidencias INTEGER NOT NULL DEFAULT 3,
+                IsApproved INTEGER NOT NULL DEFAULT 1,
+                Observations TEXT,
+                AttachmentPath TEXT,
+                CreatedAt TEXT NOT NULL,
+                FOREIGN KEY (SupplierId) REFERENCES Suppliers(Id) ON DELETE CASCADE
+            );
+
+            -- ISO 15189 §7.3.7.2: IQC Control Interno
+            CREATE TABLE IF NOT EXISTS IQCResults (
+                Id TEXT PRIMARY KEY,
+                EquipmentName TEXT NOT NULL,
+                AnalyteName TEXT NOT NULL,
+                Level TEXT,
+                Value REAL NOT NULL,
+                Mean REAL NOT NULL,
+                SD REAL NOT NULL,
+                Date TEXT NOT NULL,
+                Status INTEGER NOT NULL DEFAULT 0,
+                WestgardRule TEXT,
+                Comments TEXT
+            );
+
+            -- ISO 15189 §7.7: Quejas y Reclamaciones
+            CREATE TABLE IF NOT EXISTS Complaints (
+                Id TEXT PRIMARY KEY,
+                Date TEXT NOT NULL,
+                Source TEXT NOT NULL,
+                Description TEXT NOT NULL,
+                Category INTEGER NOT NULL DEFAULT 4,
+                InvestigationResult TEXT,
+                CorrectiveAction TEXT,
+                Status INTEGER NOT NULL DEFAULT 0,
+                ClosedAt TEXT
+            );
+
+            -- ISO 15189 §6.5/7.3.4: Incertidumbre de Medida
+            CREATE TABLE IF NOT EXISTS MeasurementUncertainties (
+                Id TEXT PRIMARY KEY,
+                MethodId TEXT NOT NULL,
+                AnalyteName TEXT NOT NULL,
+                Value REAL NOT NULL,
+                Unit TEXT NOT NULL,
+                CoverageFactor REAL NOT NULL DEFAULT 2.0,
+                ConfidenceLevel TEXT DEFAULT '95%',
+                EstimatedDate TEXT NOT NULL,
+                Notes TEXT,
+                FOREIGN KEY (MethodId) REFERENCES Methods(Id) ON DELETE CASCADE
+            );
+
+            -- ISO 15189 §7.8: Planes de Contingencia
+            CREATE TABLE IF NOT EXISTS ContingencyPlans (
+                Id TEXT PRIMARY KEY,
+                Title TEXT NOT NULL,
+                TriggerEvent TEXT NOT NULL,
+                ProcedureSteps TEXT NOT NULL,
+                ResponsiblePerson TEXT,
+                LastReviewDate TEXT,
+                Status INTEGER NOT NULL DEFAULT 0
+            );
+
             CREATE INDEX IF NOT EXISTS idx_documents_code ON Documents(DocCode);
             CREATE INDEX IF NOT EXISTS idx_versions_document ON DocumentVersions(DocumentId);
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON AuditLogs(Timestamp);
             CREATE INDEX IF NOT EXISTS idx_users_username ON Users(Username);
             CREATE INDEX IF NOT EXISTS idx_staff_name ON StaffProfiles(FullName);
+            CREATE INDEX IF NOT EXISTS idx_suppliers_name ON Suppliers(Name);
+            CREATE INDEX IF NOT EXISTS idx_supplier_evals_supplier ON SupplierEvaluations(SupplierId);
         ";
 
 
@@ -595,6 +707,13 @@ public class LocalDocumentStore
         try
         {
             using var colCmd = new SqliteCommand("ALTER TABLE Documents ADD COLUMN Area TEXT", connection);
+            await colCmd.ExecuteNonQueryAsync();
+        }
+        catch { /* Column already exists */ }
+
+        try
+        {
+            using var colCmd = new SqliteCommand("ALTER TABLE StaffTrainings ADD COLUMN CertificatePath TEXT", connection);
             await colCmd.ExecuteNonQueryAsync();
         }
         catch { /* Column already exists */ }
@@ -652,11 +771,21 @@ public class LocalDocumentStore
         await EnsureColumnExists(connection, "StaffAuthorizations", "CompetencyId", "TEXT");
         await EnsureColumnExists(connection, "StaffAuthorizations", "EvaluationId", "TEXT");
 
+        // ISO 15189:2022 Supplier Module Migrations
+        await EnsureColumnExists(connection, "Suppliers", "Address", "TEXT");
+        await EnsureColumnExists(connection, "Suppliers", "Type", "INTEGER");
+        await EnsureColumnExists(connection, "Suppliers", "QualityStatus", "INTEGER");
+        await EnsureColumnExists(connection, "Suppliers", "LastEvaluationDate", "TEXT");
+        await EnsureColumnExists(connection, "Suppliers", "NextEvaluationDate", "TEXT");
+        await EnsureColumnExists(connection, "Suppliers", "CreatedAt", "TEXT");
+        await EnsureColumnExists(connection, "Suppliers", "UpdatedAt", "TEXT");
+
+        // ISO 15189:2022 Audit Checklist Migration
+        await EnsureColumnExists(connection, "AuditPlans", "ChecklistJson", "TEXT");
+
         // Seed Document Types
         await SeedDocumentTypesAsync(connection);
-        
-        // Seed default admin user if no users exist
-        await SeedDefaultUserAsync(connection);
+
 
         // Migrate Methods to Versions (ISO 15189)
         await MigrateMethodsToVersionsAsync(connection);
@@ -746,30 +875,14 @@ public class LocalDocumentStore
         }
     }
 
-    private async Task SeedDefaultUserAsync(SqliteConnection connection)
+    public async Task<bool> HasAnyUsersAsync()
     {
-        var countSql = "SELECT COUNT(*) FROM Users";
-        using var countCmd = new SqliteCommand(countSql, connection);
-        var count = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
-        
-        if (count == 0)
-        {
-            // Create default admin user: admin / Admin123!
-            var adminId = Guid.NewGuid().ToString();
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!");
-            
-            var insertSql = @"
-                INSERT INTO Users (Id, Username, PasswordHash, FullName, Role, IsActive, CreatedAt)
-                VALUES ($id, $username, $hash, $fullname, $role, 1, $created)";
-            using var insertCmd = new SqliteCommand(insertSql, connection);
-            insertCmd.Parameters.AddWithValue("$id", adminId);
-            insertCmd.Parameters.AddWithValue("$username", "admin");
-            insertCmd.Parameters.AddWithValue("$hash", passwordHash);
-            insertCmd.Parameters.AddWithValue("$fullname", "Administrador");
-            insertCmd.Parameters.AddWithValue("$role", "Administrador");
-            insertCmd.Parameters.AddWithValue("$created", DateTime.UtcNow.ToString("o"));
-            await insertCmd.ExecuteNonQueryAsync();
-        }
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = "SELECT COUNT(*) FROM Users";
+        using var cmd = new SqliteCommand(sql, connection);
+        var count = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+        return count > 0;
     }
 
     public async Task<(bool Success, string? UserId, string? FullName, string Role)> ValidateUserAsync(string username, string password)
@@ -1826,7 +1939,7 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
 
     // 5. Staff
     try {
-        stats.ActiveStaffCount = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM Users WHERE IsActive = 1", connection).ExecuteScalarAsync());
+        stats.ActiveStaffCount = Convert.ToInt32(await new SqliteCommand("SELECT COUNT(*) FROM StaffProfiles WHERE IsActive = 1", connection).ExecuteScalarAsync());
     } catch {}
 
     // 6. EQA
@@ -3380,7 +3493,8 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
                 LeadAuditor = reader.IsDBNull(4) ? null : reader.GetString(4),
                 Status = (AuditStatus)reader.GetInt32(5),
                 SummaryReport = reader.IsDBNull(6) ? null : reader.GetString(6),
-                ReportDocumentId = reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7))
+                ReportDocumentId = reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7)),
+                ChecklistJson = reader.IsDBNull(8) ? null : reader.GetString(8)
             };
             
             // Load Findings
@@ -3413,8 +3527,8 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         await connection.OpenAsync();
         
         var id = Guid.NewGuid();
-        var sql = @"INSERT INTO AuditPlans (Id, Title, ScheduledDate, Scope, LeadAuditor, Status, ReportDocumentId)
-                    VALUES ($id, $title, $date, $scope, $lead, 0, $rep)";
+        var sql = @"INSERT INTO AuditPlans (Id, Title, ScheduledDate, Scope, LeadAuditor, Status, ReportDocumentId, ChecklistJson)
+                    VALUES ($id, $title, $date, $scope, $lead, 0, $rep, $checklist)";
         
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("$id", id.ToString());
@@ -3423,6 +3537,7 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         cmd.Parameters.AddWithValue("$scope", req.Scope ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$lead", req.LeadAuditor ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$rep", req.ReportDocumentId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$checklist", (object?)req.ChecklistJson ?? DBNull.Value);
         
         await cmd.ExecuteNonQueryAsync();
         
@@ -3434,7 +3549,8 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
             Scope = req.Scope ?? "",
             LeadAuditor = req.LeadAuditor,
             Status = AuditStatus.PLANNED,
-            ReportDocumentId = req.ReportDocumentId
+            ReportDocumentId = req.ReportDocumentId,
+            ChecklistJson = req.ChecklistJson
         };
     }
 
@@ -3443,7 +3559,7 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         await connection.OpenAsync();
         
-        var sql = "UPDATE AuditPlans SET Title=$title, ScheduledDate=$date, Scope=$scope, LeadAuditor=$lead, ReportDocumentId=$rep WHERE Id=$id";
+        var sql = "UPDATE AuditPlans SET Title=$title, ScheduledDate=$date, Scope=$scope, LeadAuditor=$lead, ReportDocumentId=$rep, ChecklistJson=$checklist WHERE Id=$id";
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("$id", id.ToString());
         cmd.Parameters.AddWithValue("$title", req.Title);
@@ -3451,6 +3567,7 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         cmd.Parameters.AddWithValue("$scope", req.Scope ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$lead", req.LeadAuditor ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$rep", req.ReportDocumentId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$checklist", (object?)req.ChecklistJson ?? DBNull.Value);
         return await cmd.ExecuteNonQueryAsync() > 0;
     }
 
@@ -4674,12 +4791,12 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
 
 
 
-    public async Task<bool> RegisterTrainingAsync(RegisterTrainingRequest request)
+    public async Task<bool> RegisterTrainingAsync(RegisterTrainingRequest request, string? certificatePath = null)
     {
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         await connection.OpenAsync();
-        var sql = @"INSERT INTO StaffTrainings (Id, StaffId, TrainingActivityId, Title, Provider, CompletionDate, Hours, Result, Notes, CompetencyId)
-                    VALUES ($id, $sid, $tid, $title, $prov, $date, $hours, $res, $notes, $cid)";
+        var sql = @"INSERT INTO StaffTrainings (Id, StaffId, TrainingActivityId, Title, Provider, CompletionDate, Hours, Result, Notes, CompetencyId, CertificatePath)
+                    VALUES ($id, $sid, $tid, $title, $prov, $date, $hours, $res, $notes, $cid, $cert)";
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
         cmd.Parameters.AddWithValue("$sid", request.StaffId.ToString());
@@ -4691,18 +4808,26 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         cmd.Parameters.AddWithValue("$res", request.Result);
         cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$cid", request.CompetencyId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$cert", certificatePath ?? (object)DBNull.Value);
         
         return await cmd.ExecuteNonQueryAsync() > 0;
     }
 
-    public async Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request)
+    public async Task<bool> UpdateTrainingAsync(UpdateTrainingRequest request, string? certificatePath = null)
     {
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         await connection.OpenAsync();
+        
         var sql = @"UPDATE StaffTrainings SET 
                     Title=$title, Provider=$prov, Hours=$hours, CompletionDate=$date, 
-                    Result=$res, Notes=$notes, CompetencyId=$cid
-                    WHERE Id=$id";
+                    Result=$res, Notes=$notes, CompetencyId=$cid";
+
+        if (certificatePath != null)
+        {
+            sql += ", CertificatePath=$cert";
+        }
+
+        sql += " WHERE Id=$id";
         
         using var cmd = new SqliteCommand(sql, connection);
         cmd.Parameters.AddWithValue("$id", request.Id.ToString());
@@ -4713,6 +4838,10 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
         cmd.Parameters.AddWithValue("$res", request.Result);
         cmd.Parameters.AddWithValue("$notes", request.Notes ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("$cid", request.CompetencyId?.ToString() ?? (object)DBNull.Value);
+        if (certificatePath != null)
+        {
+            cmd.Parameters.AddWithValue("$cert", certificatePath);
+        }
         
         return await cmd.ExecuteNonQueryAsync() > 0;
     }
@@ -4850,7 +4979,8 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
                 Hours = Convert.ToDecimal(reader["Hours"]),
                 Result = reader["Result"].ToString()!,
                 CompetencyNameRef = reader["CompetencyNameRef"] == DBNull.Value ? null : reader["CompetencyNameRef"].ToString(),
-                CompetencyId = reader["CompetencyId"] == DBNull.Value ? null : Guid.Parse(reader["CompetencyId"].ToString()!)
+                CompetencyId = reader["CompetencyId"] == DBNull.Value ? null : Guid.Parse(reader["CompetencyId"].ToString()!),
+                CertificatePath = reader.GetOrdinal("CertificatePath") >= 0 && !reader.IsDBNull(reader.GetOrdinal("CertificatePath")) ? reader["CertificatePath"].ToString() : null
             };
             list.Add(dto);
         }
@@ -4920,6 +5050,690 @@ public async Task<DashboardDataDto> GetDashboardDataAsync()
     }
 
 
+
+    #endregion
+
+    #region Supplier Management (ISO 15189:2022 Section 6.8)
+
+    public async Task<List<SupplierListDto>> GetSuppliersAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var list = new List<SupplierListDto>();
+
+        var sql = @"SELECT s.*, 
+                    (SELECT COUNT(*) FROM SupplierEvaluations e WHERE e.SupplierId = s.Id) as EvalCount,
+                    (SELECT COUNT(*) FROM Incidents i WHERE i.Origin LIKE '%' || s.Name || '%') as IncidentCount
+                    FROM Suppliers s ORDER BY s.Name";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            // Check for expired evaluation
+            var qualityStatus = reader["QualityStatus"] == DBNull.Value ? 0 : Convert.ToInt32(reader["QualityStatus"]);
+            var nextEvalDate = reader["NextEvaluationDate"] == DBNull.Value ? (DateTime?)null : DateTime.Parse(reader["NextEvaluationDate"].ToString()!);
+            
+            if (nextEvalDate.HasValue && nextEvalDate.Value < DateTime.UtcNow && qualityStatus != (int)SupplierQualityStatus.NO_APTO)
+            {
+                qualityStatus = (int)SupplierQualityStatus.EVALUACION_CADUCADA;
+            }
+
+            list.Add(new SupplierListDto(
+                Guid.Parse(reader["Id"].ToString()!),
+                reader["Name"].ToString()!,
+                (SupplierType)(reader["Type"] == DBNull.Value ? 0 : Convert.ToInt32(reader["Type"])),
+                (SupplierQualityStatus)qualityStatus,
+                reader["LastEvaluationDate"] == DBNull.Value ? null : DateTime.Parse(reader["LastEvaluationDate"].ToString()!),
+                nextEvalDate,
+                Convert.ToInt32(reader["EvalCount"]),
+                Convert.ToInt32(reader["IncidentCount"])
+            ));
+        }
+        return list;
+    }
+
+    public async Task<SupplierDetailDto?> GetSupplierByIdAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT * FROM Suppliers WHERE Id = $id";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return null;
+
+        var dto = new SupplierDetailDto
+        {
+            Id = Guid.Parse(reader["Id"].ToString()!),
+            Name = reader["Name"].ToString()!,
+            ContactName = reader["ContactName"]?.ToString(),
+            Email = reader["Email"]?.ToString(),
+            Phone = reader["Phone"]?.ToString(),
+            Address = reader["Address"]?.ToString(),
+            Notes = reader["Notes"]?.ToString(),
+            Type = (SupplierType)(reader["Type"] == DBNull.Value ? 0 : Convert.ToInt32(reader["Type"])),
+            QualityStatus = (SupplierQualityStatus)(reader["QualityStatus"] == DBNull.Value ? 0 : Convert.ToInt32(reader["QualityStatus"])),
+            LastEvaluationDate = reader["LastEvaluationDate"] == DBNull.Value ? null : DateTime.Parse(reader["LastEvaluationDate"].ToString()!),
+            NextEvaluationDate = reader["NextEvaluationDate"] == DBNull.Value ? null : DateTime.Parse(reader["NextEvaluationDate"].ToString()!),
+            CreatedAt = reader["CreatedAt"] == DBNull.Value ? DateTime.MinValue : DateTime.Parse(reader["CreatedAt"].ToString()!)
+        };
+
+        // Check for expired status
+        if (dto.NextEvaluationDate.HasValue && dto.NextEvaluationDate.Value < DateTime.UtcNow && dto.QualityStatus != SupplierQualityStatus.NO_APTO)
+        {
+            dto.QualityStatus = SupplierQualityStatus.EVALUACION_CADUCADA;
+        }
+
+        dto.Evaluations = await GetSupplierEvaluationsAsync(id);
+        return dto;
+    }
+
+    public async Task CreateSupplierAsync(Supplier supplier)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"INSERT INTO Suppliers (Id, Name, ContactName, Email, Phone, Address, Notes, Type, QualityStatus, CreatedAt, UpdatedAt)
+                    VALUES ($id, $name, $contact, $email, $phone, $address, $notes, $type, $status, $created, $updated)";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", supplier.Id.ToString());
+        cmd.Parameters.AddWithValue("$name", supplier.Name);
+        cmd.Parameters.AddWithValue("$contact", supplier.ContactName ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$email", supplier.Email ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$phone", supplier.Phone ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$address", supplier.Address ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$notes", supplier.Notes ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$type", (int)supplier.Type);
+        cmd.Parameters.AddWithValue("$status", (int)supplier.QualityStatus);
+        cmd.Parameters.AddWithValue("$created", DateTime.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("O"));
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<bool> UpdateSupplierAsync(SupplierDetailDto supplier)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"UPDATE Suppliers SET 
+                    Name = $name, ContactName = $contact, Email = $email, Phone = $phone, 
+                    Address = $address, Notes = $notes, Type = $type, UpdatedAt = $updated
+                    WHERE Id = $id";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", supplier.Id.ToString());
+        cmd.Parameters.AddWithValue("$name", supplier.Name);
+        cmd.Parameters.AddWithValue("$contact", supplier.ContactName ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$email", supplier.Email ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$phone", supplier.Phone ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$address", supplier.Address ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$notes", supplier.Notes ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$type", (int)supplier.Type);
+        cmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("O"));
+
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<bool> DeleteSupplierAsync(Guid id)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "DELETE FROM Suppliers WHERE Id = $id";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    public async Task<List<SupplierEvaluationDto>> GetSupplierEvaluationsAsync(Guid supplierId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var list = new List<SupplierEvaluationDto>();
+
+        var sql = @"SELECT e.*, u.FullName as EvaluatorName 
+                    FROM SupplierEvaluations e
+                    LEFT JOIN Users u ON e.EvaluatorUserId = u.Id
+                    WHERE e.SupplierId = $supplierId
+                    ORDER BY e.EvaluationDate DESC";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$supplierId", supplierId.ToString());
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            list.Add(new SupplierEvaluationDto
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                SupplierId = Guid.Parse(reader["SupplierId"].ToString()!),
+                EvaluationDate = DateTime.Parse(reader["EvaluationDate"].ToString()!),
+                EvaluatorName = reader["EvaluatorName"]?.ToString(),
+                EvaluatedPeriod = reader["EvaluatedPeriod"]?.ToString() ?? "",
+                ScorePlazos = Convert.ToInt32(reader["ScorePlazos"]),
+                ScoreCalidad = Convert.ToInt32(reader["ScoreCalidad"]),
+                ScoreServicio = Convert.ToInt32(reader["ScoreServicio"]),
+                ScoreIncidencias = Convert.ToInt32(reader["ScoreIncidencias"]),
+                IsApproved = Convert.ToInt32(reader["IsApproved"]) == 1,
+                Observations = reader["Observations"]?.ToString(),
+                AttachmentPath = reader["AttachmentPath"]?.ToString()
+            });
+        }
+        return list;
+    }
+
+    public async Task CreateSupplierEvaluationAsync(SupplierEvaluation eval, SupplierQualityStatus newStatus, DateTime? nextEvalDate)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        // 1. Insert evaluation
+        var sql = @"INSERT INTO SupplierEvaluations 
+                    (Id, SupplierId, EvaluationDate, EvaluatorUserId, EvaluatedPeriod, ScorePlazos, ScoreCalidad, ScoreServicio, ScoreIncidencias, IsApproved, Observations, AttachmentPath, CreatedAt)
+                    VALUES ($id, $supplierId, $evalDate, $evaluator, $period, $plazos, $calidad, $servicio, $incidencias, $approved, $obs, $attachment, $created)";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", eval.Id.ToString());
+        cmd.Parameters.AddWithValue("$supplierId", eval.SupplierId.ToString());
+        cmd.Parameters.AddWithValue("$evalDate", eval.EvaluationDate.ToString("O"));
+        cmd.Parameters.AddWithValue("$evaluator", eval.EvaluatorUserId?.ToString() ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$period", eval.EvaluatedPeriod ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$plazos", eval.ScorePlazos);
+        cmd.Parameters.AddWithValue("$calidad", eval.ScoreCalidad);
+        cmd.Parameters.AddWithValue("$servicio", eval.ScoreServicio);
+        cmd.Parameters.AddWithValue("$incidencias", eval.ScoreIncidencias);
+        cmd.Parameters.AddWithValue("$approved", eval.IsApproved ? 1 : 0);
+        cmd.Parameters.AddWithValue("$obs", eval.Observations ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$attachment", eval.AttachmentPath ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$created", DateTime.UtcNow.ToString("O"));
+
+        await cmd.ExecuteNonQueryAsync();
+
+        // 2. Update supplier status and dates
+        var updateSql = @"UPDATE Suppliers SET 
+                          QualityStatus = $status, LastEvaluationDate = $lastEval, NextEvaluationDate = $nextEval, UpdatedAt = $updated
+                          WHERE Id = $supplierId";
+
+        using var updateCmd = new SqliteCommand(updateSql, connection);
+        updateCmd.Parameters.AddWithValue("$supplierId", eval.SupplierId.ToString());
+        updateCmd.Parameters.AddWithValue("$status", (int)newStatus);
+        updateCmd.Parameters.AddWithValue("$lastEval", eval.EvaluationDate.ToString("O"));
+        updateCmd.Parameters.AddWithValue("$nextEval", nextEvalDate?.ToString("O") ?? (object)DBNull.Value);
+        updateCmd.Parameters.AddWithValue("$updated", DateTime.UtcNow.ToString("O"));
+
+        await updateCmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<int> GetSupplierIncidentCountAsync(Guid supplierId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        // Get supplier name for matching
+        var nameSql = "SELECT Name FROM Suppliers WHERE Id = $id";
+        using var nameCmd = new SqliteCommand(nameSql, connection);
+        nameCmd.Parameters.AddWithValue("$id", supplierId.ToString());
+        var name = await nameCmd.ExecuteScalarAsync();
+        if (name == null) return 0;
+
+        // Count incidents from last year with this supplier in Origin
+        var sql = @"SELECT COUNT(*) FROM Incidents 
+                    WHERE Origin LIKE '%' || $name || '%'
+                    AND DetectedAt >= $yearAgo";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$name", name.ToString());
+        cmd.Parameters.AddWithValue("$yearAgo", DateTime.UtcNow.AddYears(-1).ToString("O"));
+
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+    }
+
+    public async Task UpdateExpiredSupplierEvaluationsAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"UPDATE Suppliers SET QualityStatus = $expired, UpdatedAt = $now
+                    WHERE NextEvaluationDate < $today 
+                    AND QualityStatus != $noApto
+                    AND QualityStatus != $expired";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$expired", (int)SupplierQualityStatus.EVALUACION_CADUCADA);
+        cmd.Parameters.AddWithValue("$noApto", (int)SupplierQualityStatus.NO_APTO);
+        cmd.Parameters.AddWithValue("$today", DateTime.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("O"));
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    #endregion
+
+    #region IQC / Control Interno (ISO 15189 §7.3.7.2)
+
+    public async Task<List<IQCListDto>> GetIQCResultsAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = "SELECT Id, EquipmentName, AnalyteName, Level, Value, Status, Date, WestgardRule FROM IQCResults ORDER BY Date DESC";
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<IQCListDto>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new IQCListDto
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                EquipmentName = reader.GetString(1),
+                AnalyteName = reader.GetString(2),
+                Level = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                Value = reader.GetDouble(4),
+                Status = (IQCStatus)reader.GetInt32(5),
+                Date = DateTime.Parse(reader.GetString(6)),
+                WestgardRule = reader.IsDBNull(7) ? null : reader.GetString(7)
+            });
+        }
+        return list;
+    }
+
+    public async Task<IQCResult> CreateIQCResultAsync(CreateIQCResultRequest req)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var id = Guid.NewGuid();
+
+        // Westgard evaluation
+        double zScore = req.SD > 0 ? Math.Abs(req.Value - req.Mean) / req.SD : 0;
+        IQCStatus status = IQCStatus.OK;
+        string? westgardRule = null;
+        if (zScore >= 3) { status = IQCStatus.REJECTED; westgardRule = "1-3s"; }
+        else if (zScore >= 2) { status = IQCStatus.WARNING; westgardRule = "1-2s"; }
+
+        var sql = @"INSERT INTO IQCResults (Id, EquipmentName, AnalyteName, Level, Value, Mean, SD, Date, Status, WestgardRule, Comments)
+                    VALUES ($id, $equip, $analyte, $level, $val, $mean, $sd, $date, $status, $rule, $comments)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$equip", req.EquipmentName);
+        cmd.Parameters.AddWithValue("$analyte", req.AnalyteName);
+        cmd.Parameters.AddWithValue("$level", req.Level);
+        cmd.Parameters.AddWithValue("$val", req.Value);
+        cmd.Parameters.AddWithValue("$mean", req.Mean);
+        cmd.Parameters.AddWithValue("$sd", req.SD);
+        cmd.Parameters.AddWithValue("$date", req.Date.ToString("o"));
+        cmd.Parameters.AddWithValue("$status", (int)status);
+        cmd.Parameters.AddWithValue("$rule", (object?)westgardRule ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$comments", (object?)req.Comments ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync();
+
+        return new IQCResult
+        {
+            Id = id, EquipmentName = req.EquipmentName, AnalyteName = req.AnalyteName,
+            Level = req.Level, Value = req.Value, Mean = req.Mean, SD = req.SD,
+            Date = req.Date, Status = status, WestgardRule = westgardRule, Comments = req.Comments
+        };
+    }
+
+    #endregion
+
+    #region Quejas y Reclamaciones (ISO 15189 §7.7)
+
+    public async Task<List<ComplaintListDto>> GetComplaintsAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = "SELECT Id, Date, Source, Description, Category, Status FROM Complaints ORDER BY Date DESC";
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<ComplaintListDto>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new ComplaintListDto
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                Date = DateTime.Parse(reader.GetString(1)),
+                Source = reader.GetString(2),
+                Description = reader.GetString(3),
+                Category = (ComplaintCategory)reader.GetInt32(4),
+                Status = (ComplaintStatus)reader.GetInt32(5)
+            });
+        }
+        return list;
+    }
+
+    public async Task<Complaint> CreateComplaintAsync(CreateComplaintRequest req)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var id = Guid.NewGuid();
+        var sql = @"INSERT INTO Complaints (Id, Date, Source, Description, Category, InvestigationResult, CorrectiveAction, Status)
+                    VALUES ($id, $date, $source, $desc, $cat, $inv, $action, 0)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$date", DateTime.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("$source", req.Source);
+        cmd.Parameters.AddWithValue("$desc", req.Description);
+        cmd.Parameters.AddWithValue("$cat", (int)req.Category);
+        cmd.Parameters.AddWithValue("$inv", (object?)req.InvestigationResult ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$action", (object?)req.CorrectiveAction ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync();
+
+        return new Complaint { Id = id, Date = DateTime.UtcNow, Source = req.Source, Description = req.Description, Category = req.Category };
+    }
+
+    public async Task<bool> UpdateComplaintStatusAsync(Guid id, ComplaintStatus status)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var closedAt = status == ComplaintStatus.CLOSED ? $", ClosedAt='{DateTime.UtcNow:o}'" : "";
+        var sql = $"UPDATE Complaints SET Status=$status{closedAt} WHERE Id=$id";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$status", (int)status);
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    #endregion
+
+    #region Incertidumbre de Medida (ISO 15189 §6.5, 7.3.4)
+
+    public async Task<List<MeasurementUncertainty>> GetUncertaintiesAsync(Guid methodId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = "SELECT Id, MethodId, AnalyteName, Value, Unit, CoverageFactor, ConfidenceLevel, EstimatedDate, Notes FROM MeasurementUncertainties WHERE MethodId=$mid ORDER BY EstimatedDate DESC";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$mid", methodId.ToString());
+        using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<MeasurementUncertainty>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new MeasurementUncertainty
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                MethodId = Guid.Parse(reader.GetString(1)),
+                AnalyteName = reader.GetString(2),
+                Value = reader.GetDouble(3),
+                Unit = reader.GetString(4),
+                CoverageFactor = reader.GetDouble(5),
+                ConfidenceLevel = reader.IsDBNull(6) ? "95%" : reader.GetString(6),
+                EstimatedDate = DateTime.Parse(reader.GetString(7)),
+                Notes = reader.IsDBNull(8) ? null : reader.GetString(8)
+            });
+        }
+        return list;
+    }
+
+    public async Task<MeasurementUncertainty> CreateUncertaintyAsync(Guid methodId, string analyteName, double value, string unit, double coverageFactor, string confidenceLevel, string? notes)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var id = Guid.NewGuid();
+        var sql = @"INSERT INTO MeasurementUncertainties (Id, MethodId, AnalyteName, Value, Unit, CoverageFactor, ConfidenceLevel, EstimatedDate, Notes)
+                    VALUES ($id, $mid, $analyte, $val, $unit, $k, $conf, $date, $notes)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$mid", methodId.ToString());
+        cmd.Parameters.AddWithValue("$analyte", analyteName);
+        cmd.Parameters.AddWithValue("$val", value);
+        cmd.Parameters.AddWithValue("$unit", unit);
+        cmd.Parameters.AddWithValue("$k", coverageFactor);
+        cmd.Parameters.AddWithValue("$conf", confidenceLevel);
+        cmd.Parameters.AddWithValue("$date", DateTime.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("$notes", (object?)notes ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync();
+
+        return new MeasurementUncertainty { Id = id, MethodId = methodId, AnalyteName = analyteName, Value = value, Unit = unit, CoverageFactor = coverageFactor, ConfidenceLevel = confidenceLevel, EstimatedDate = DateTime.UtcNow, Notes = notes };
+    }
+
+    #endregion
+
+    #region Planes de Contingencia (ISO 15189 §7.8)
+
+    public async Task<List<ContingencyListDto>> GetContingencyPlansAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var sql = "SELECT Id, Title, TriggerEvent, Status, LastReviewDate FROM ContingencyPlans ORDER BY Title";
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<ContingencyListDto>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new ContingencyListDto
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                Title = reader.GetString(1),
+                TriggerEvent = reader.GetString(2),
+                Status = (ContingencyStatus)reader.GetInt32(3),
+                LastReviewDate = reader.IsDBNull(4) ? null : DateTime.Parse(reader.GetString(4))
+            });
+        }
+        return list;
+    }
+
+    public async Task<ContingencyPlan> CreateContingencyPlanAsync(CreateContingencyPlanRequest req)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var id = Guid.NewGuid();
+        var sql = @"INSERT INTO ContingencyPlans (Id, Title, TriggerEvent, ProcedureSteps, ResponsiblePerson, Status)
+                    VALUES ($id, $title, $trigger, $steps, $resp, 0)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$title", req.Title);
+        cmd.Parameters.AddWithValue("$trigger", req.TriggerEvent);
+        cmd.Parameters.AddWithValue("$steps", req.ProcedureSteps);
+        cmd.Parameters.AddWithValue("$resp", (object?)req.ResponsiblePerson ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync();
+
+        return new ContingencyPlan { Id = id, Title = req.Title, TriggerEvent = req.TriggerEvent, ProcedureSteps = req.ProcedureSteps, ResponsiblePerson = req.ResponsiblePerson };
+    }
+
+    public async Task<bool> UpdateContingencyStatusAsync(Guid id, ContingencyStatus status)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        var reviewDate = status == ContingencyStatus.ACTIVE ? $", LastReviewDate='{DateTime.UtcNow:o}'" : "";
+        var sql = $"UPDATE ContingencyPlans SET Status=$status{reviewDate} WHERE Id=$id";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        cmd.Parameters.AddWithValue("$status", (int)status);
+        return await cmd.ExecuteNonQueryAsync() > 0;
+    }
+
+    // Permissions & Roles Management
+
+    public async Task<Role?> GetRoleByNameAsync(string roleName)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT Id, RoleName, Description, CreatedAt FROM Roles WHERE RoleName = $name";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$name", roleName);
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return new Role
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                RoleName = reader.GetString(1),
+                Description = reader.IsDBNull(2) ? null : reader.GetString(2),
+                CreatedAt = DateTime.Parse(reader.GetString(3))
+            };
+        }
+        return null;
+    }
+
+    public async Task<Role> CreateRoleAsync(Role role)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "INSERT INTO Roles (Id, RoleName, Description, CreatedAt) VALUES ($id, $name, $desc, $created)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", role.Id.ToString());
+        cmd.Parameters.AddWithValue("$name", role.RoleName);
+        cmd.Parameters.AddWithValue("$desc", role.Description ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("$created", role.CreatedAt.ToString("o"));
+        
+        await cmd.ExecuteNonQueryAsync();
+        return role;
+    }
+
+    public async Task<List<Role>> GetAllRolesAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT Id, RoleName, Description, CreatedAt FROM Roles";
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+        
+        var list = new List<Role>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Role
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                RoleName = reader.GetString(1),
+                Description = reader.IsDBNull(2) ? null : reader.GetString(2),
+                CreatedAt = DateTime.Parse(reader.GetString(3))
+            });
+        }
+        return list;
+    }
+
+    public async Task<Permission?> GetPermissionByKeyAsync(string key)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT Id, PermissionKey, Description FROM Permissions WHERE PermissionKey = $key";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$key", key);
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return new Permission
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                PermissionKey = reader.GetString(1),
+                Description = reader.IsDBNull(2) ? null : reader.GetString(2)
+            };
+        }
+        return null;
+    }
+
+    public async Task<Permission> CreatePermissionAsync(Permission permission)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "INSERT INTO Permissions (Id, PermissionKey, Description) VALUES ($id, $key, $desc)";
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$id", permission.Id.ToString());
+        cmd.Parameters.AddWithValue("$key", permission.PermissionKey);
+        cmd.Parameters.AddWithValue("$desc", permission.Description ?? (object)DBNull.Value);
+
+        await cmd.ExecuteNonQueryAsync();
+        return permission;
+    }
+
+    public async Task<List<Permission>> GetAllPermissionsAsync()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = "SELECT Id, PermissionKey, Description FROM Permissions";
+        using var cmd = new SqliteCommand(sql, connection);
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var list = new List<Permission>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Permission
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                PermissionKey = reader.GetString(1),
+                Description = reader.IsDBNull(2) ? null : reader.GetString(2)
+            });
+        }
+        return list;
+    }
+
+    public async Task<List<Permission>> GetPermissionsForRoleAsync(Guid roleId)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+
+        var sql = @"
+            SELECT p.Id, p.PermissionKey, p.Description 
+            FROM Permissions p
+            JOIN RolePermissions rp ON p.Id = rp.PermissionId
+            WHERE rp.RoleId = $rid";
+
+        using var cmd = new SqliteCommand(sql, connection);
+        cmd.Parameters.AddWithValue("$rid", roleId.ToString());
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<Permission>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Permission
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                PermissionKey = reader.GetString(1),
+                Description = reader.IsDBNull(2) ? null : reader.GetString(2)
+            });
+        }
+        return list;
+    }
+
+    public async Task UpdateRolePermissionsAsync(Guid roleId, List<Guid> permissionIds)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            // Clear existing
+            var clearSql = "DELETE FROM RolePermissions WHERE RoleId = $rid";
+            using (var clearCmd = new SqliteCommand(clearSql, connection, transaction))
+            {
+                clearCmd.Parameters.AddWithValue("$rid", roleId.ToString());
+                await clearCmd.ExecuteNonQueryAsync();
+            }
+
+            // Insert new
+            var insertSql = "INSERT INTO RolePermissions (RoleId, PermissionId) VALUES ($rid, $pid)";
+            foreach (var pid in permissionIds)
+            {
+                using var insertCmd = new SqliteCommand(insertSql, connection, transaction);
+                insertCmd.Parameters.AddWithValue("$rid", roleId.ToString());
+                insertCmd.Parameters.AddWithValue("$pid", pid.ToString());
+                await insertCmd.ExecuteNonQueryAsync();
+            }
+
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
 
     #endregion
 

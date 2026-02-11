@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="QMSFlowDoc.Client.Views.PermissionsConfigView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:QMSFlowDoc.Client.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="Matriz de Permisos" Style="{StaticResource TitleTextBlockStyle}"/>
+            <TextBlock Text="Configure los accesos para cada rol. Solo el Administrador puede modificar esta tabla." 
+                       Foreground="{ThemeResource SystemControlPageTextBaseMediumBrush}"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Margin="0,24">
+            <!-- Dynamic Grid will be injected here or use ItemsControl -->
+            <Grid x:Name="MatrixGrid" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" Padding="12">
+                <!-- Programmatic content -->
+            </Grid>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+            <Button x:Name="SaveButton" Content="Guardar Cambios" Style="{StaticResource AccentButtonStyle}" Click="Save_Click"/>
+            <Button Content="Cancelar" Click="Cancel_Click"/>
+        </StackPanel>
+
+        <ProgressRing x:Name="LoadingRing" IsActive="False" Grid.RowSpan="3" Width="50" Height="50"/>
+    </Grid>
+</Page>

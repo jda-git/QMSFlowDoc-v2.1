@@ -25,8 +25,9 @@ public sealed partial class MainWindow : Window
         _authService = ((App)Application.Current).AuthService;
         _searchService = ((App)Application.Current).SearchService;
         
-        var syncEngine = ((App)Application.Current).DriveSyncEngine;
-        syncEngine.SyncStatusChanged += SyncEngine_SyncStatusChanged;
+        // Drive Sync Engine removed
+        // var syncEngine = ((App)Application.Current).DriveSyncEngine;
+        // syncEngine.SyncStatusChanged += SyncEngine_SyncStatusChanged;
         
         // Start periodic status updates (every 10 seconds)
         _statusUpdateTimer = new System.Threading.Timer(
@@ -122,6 +123,7 @@ public sealed partial class MainWindow : Window
     }
 
 
+    /* 
     private void SyncEngine_SyncStatusChanged(string status)
     {
         this.DispatcherQueue.TryEnqueue(() =>
@@ -129,6 +131,7 @@ public sealed partial class MainWindow : Window
             SyncStatusText.Text = status;
         });
     }
+    */
 
     private async System.Threading.Tasks.Task UpdateSyncStatusAsync()
     {
@@ -294,14 +297,75 @@ public sealed partial class MainWindow : Window
         RootFrame.Navigate(typeof(Views.LoginView));
     }
 
-    public void ShowMain()
+    public async void ShowMain()
     {
         RootFrame.Visibility = Visibility.Collapsed;
         RootFrame.Content = null;
         RootNavigationView.Visibility = Visibility.Visible;
         RootNavigationView.SelectedItem = RootNavigationView.MenuItems[0];
         RootNavigationView.SelectionChanged += RootNavigationView_SelectionChanged;
+        
+        await UpdateMenuVisibility();
+        
         NavigateToTag("dashboard");
+    }
+
+    private async System.Threading.Tasks.Task UpdateMenuVisibility()
+    {
+        var app = (App)Application.Current;
+        var roles = app.AuthService.CurrentRoles;
+        if (roles == null || !roles.Any()) return;
+
+        // Helper
+        async System.Threading.Tasks.Task<bool> Check(string key)
+        {
+            foreach(var r in roles)
+            {
+                // Admin always has all
+                if (r == "Administrador") return true; 
+                if (await app.PermissionsService.HasPermissionAsync(r, key)) return true;
+            }
+            return false;
+        }
+
+        foreach (var item in RootNavigationView.MenuItems.OfType<NavigationViewItem>())
+        {
+            bool visible = true;
+            var tag = item.Tag?.ToString();
+            
+            if (tag == "dashboard") visible = await Check("Dashboard.View");
+            else if (tag == "documents") visible = await Check("Documents.View");
+            else if (tag == "inventory") visible = await Check("Inventory.View");
+            else if (tag == "suppliers") visible = await Check("Suppliers.View");
+            else if (tag == "equipment") visible = await Check("Equipment.View");
+            else if (tag == "personal") visible = await Check("Staff.View");
+            else if (tag == "eqa") visible = await Check("EQA.View");
+            else if (tag == "iqc") visible = await Check("IQC.View");
+            else if (tag == "methods") visible = await Check("Methods.View");
+            else if (tag == "improvement") visible = await Check("Improvements.View");
+            else if (tag == "audit") visible = await Check("Audits.View");
+            else if (tag == "issues") visible = await Check("Incidents.View");
+            else if (tag == "complaints") visible = await Check("Complaints.View");
+            else if (tag == "competencies_group") 
+            {
+                 bool cat = await Check("Competency.Catalog");
+                 bool mat = await Check("Competency.Matrix");
+                 bool train = await Check("Competency.Training");
+                 bool auth = await Check("Competency.Auth");
+                 visible = cat || mat || train || auth;
+
+                 foreach(var sub in item.MenuItems.OfType<NavigationViewItem>())
+                 {
+                     var subTag = sub.Tag?.ToString();
+                     if (subTag == "competencies_catalog") sub.Visibility = cat ? Visibility.Visible : Visibility.Collapsed;
+                     if (subTag == "competencies_matrix") sub.Visibility = mat ? Visibility.Visible : Visibility.Collapsed;
+                     if (subTag == "competencies_training") sub.Visibility = train ? Visibility.Visible : Visibility.Collapsed;
+                     if (subTag == "competencies_auth") sub.Visibility = auth ? Visibility.Visible : Visibility.Collapsed;
+                 }
+            }
+
+            item.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 
     private void RootNavigationView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -329,6 +393,9 @@ public sealed partial class MainWindow : Window
                 break;
             case "inventory":
                 ContentFrame.Navigate(typeof(Views.InventoryView));
+                break;
+            case "suppliers":
+                ContentFrame.Navigate(typeof(Views.SuppliersView));
                 break;
             case "equipment":
                 ContentFrame.Navigate(typeof(Views.EquipmentView));
@@ -363,6 +430,12 @@ public sealed partial class MainWindow : Window
                 break;
             case "issues":
                 ContentFrame.Navigate(typeof(Views.IssuesView));
+                break;
+            case "iqc":
+                ContentFrame.Navigate(typeof(Views.IQCView));
+                break;
+            case "complaints":
+                ContentFrame.Navigate(typeof(Views.ComplaintsView));
                 break;
             default:
                 ContentFrame.Navigate(typeof(Views.DashboardView));

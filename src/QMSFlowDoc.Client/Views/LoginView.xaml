@@ -8,25 +8,41 @@
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
-        <StackPanel Spacing="20" Padding="40" Background="{ThemeResource LayerFillColorDefaultBrush}" 
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
-            <TextBlock Text="QMS FlowDoc" Style="{StaticResource TitleTextBlockStyle}" HorizontalAlignment="Center" />
-            <TextBlock Text="Inicie sesión para continuar" Style="{StaticResource BodyTextBlockStyle}" HorizontalAlignment="Center" />
-            
-            <TextBox x:Name="UsernameBox" Header="Usuario" PlaceholderText="nombre.usuario" HorizontalAlignment="Stretch" />
-            <PasswordBox x:Name="PasswordBox" Header="Contraseña" PlaceholderText="••••••••" HorizontalAlignment="Stretch" />
-            
-            <Button x:Name="LoginButton" Content="Iniciar Sesión" Style="{StaticResource AccentButtonStyle}" 
-                    HorizontalAlignment="Stretch" Click="LoginButton_Click" Height="40" />
+    <Grid>
+        <!-- Fondo de Pantalla -->
+        <Image Source="ms-appx:///Assets/login_cover.png" Stretch="UniformToFill" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+        
+        <!-- Login Card -->
+        <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
+            <StackPanel Spacing="20" Padding="40" Background="{ThemeResource LayerFillColorDefaultBrush}" 
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                <TextBlock Text="QMS FlowDoc" Style="{StaticResource TitleTextBlockStyle}" HorizontalAlignment="Center" />
+                <TextBlock Text="Inicie sesión para continuar" Style="{StaticResource BodyTextBlockStyle}" HorizontalAlignment="Center" />
+                
+                <TextBox x:Name="UsernameBox" Header="Usuario" PlaceholderText="nombre.usuario" HorizontalAlignment="Stretch" KeyUp="OnInputKeyUp" />
+                <PasswordBox x:Name="PasswordBox" Header="Contraseña" PlaceholderText="••••••••" HorizontalAlignment="Stretch" KeyUp="OnInputKeyUp" />
+                
+                <Button x:Name="LoginButton" Content="Iniciar Sesión" Style="{StaticResource AccentButtonStyle}" 
+                        HorizontalAlignment="Stretch" Click="LoginButton_Click" Height="40" />
 
-            <Button x:Name="BootstrapButton" Content="Configuración Inicial de Sistema" 
-                    HorizontalAlignment="Stretch" Click="BootstrapButton_Click" 
-                    Visibility="Collapsed" Height="40" />
-            
-            <TextBlock x:Name="ErrorText" Foreground="Red" HorizontalAlignment="Center" Visibility="Collapsed" TextWrapping="Wrap" />
-            
-            <ProgressRing x:Name="LoginProgress" IsActive="False" HorizontalAlignment="Center" />
-        </StackPanel>
+                <Button x:Name="BootstrapButton" Content="Crear Administrador Inicial" 
+                        Style="{StaticResource AccentButtonStyle}"
+                        HorizontalAlignment="Stretch" Click="BootstrapButton_Click" 
+                        Visibility="Collapsed" Height="40" />
+                
+                <PasswordBox x:Name="ConfirmPasswordBox" Header="Confirmar Contraseña" 
+                             PlaceholderText="••••••••" HorizontalAlignment="Stretch"
+                             Visibility="Collapsed" />
+                
+                <TextBlock x:Name="BootstrapInfo" 
+                           Text="Primera ejecución: cree un usuario administrador. La contraseña debe tener al menos 8 caracteres."
+                           TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                           FontSize="12" Visibility="Collapsed" />
+                
+                <TextBlock x:Name="ErrorText" Foreground="Red" HorizontalAlignment="Center" Visibility="Collapsed" TextWrapping="Wrap" />
+                
+                <ProgressRing x:Name="LoginProgress" IsActive="False" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>

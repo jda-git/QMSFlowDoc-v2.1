@@ -24,8 +24,12 @@
                 <NavigationViewItem Content="Dashboard" Icon="Home" Tag="dashboard" />
                 <NavigationViewItem Content="Documentos" Icon="Document" Tag="documents" />
                 <NavigationViewItem Content="Inventario" Icon="Library" Tag="inventory" />
+                <NavigationViewItem Content="Proveedores" Icon="People" Tag="suppliers" />
                 <NavigationViewItem Content="Equipos" Icon="Setting" Tag="equipment" />
+                <!-- Personal View simplified -->
                 <NavigationViewItem Content="Personal" Icon="Contact" Tag="personal" />
+                
+                <!-- Expanded Competency Module -->
                 <NavigationViewItem Content="Competencias" Icon="AllApps" Tag="competencies_group" SelectsOnInvoked="False">
                     <NavigationViewItem.MenuItems>
                         <NavigationViewItem Content="Catálogo" Tag="competencies_catalog" Icon="Library"/>
@@ -34,12 +38,14 @@
                         <NavigationViewItem Content="Autorizaciones" Tag="competencies_auth" Icon="Permissions"/>
                     </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
+                
                 <NavigationViewItem Content="Control de Calidad (EQA)" Icon="World" Tag="eqa" />
+                <NavigationViewItem Content="Control IQC" Icon="Repair" Tag="iqc" />
                 <NavigationViewItem Content="Métodos" Icon="Library" Tag="methods" />
                 <NavigationViewItem Content="Mejoras" Icon="Highlight" Tag="improvement" />
                 <NavigationViewItem Content="Auditoría" Icon="List" Tag="audit" />
-
                 <NavigationViewItem Content="Incidencias" Icon="ReportHacked" Tag="issues" />
+                <NavigationViewItem Content="Quejas" Icon="Comment" Tag="complaints" />
             </NavigationView.MenuItems>
 
             <NavigationView.PaneFooter>

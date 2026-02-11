@@ -64,6 +64,23 @@
                      Margin="6,0,0,0"/>
         </Grid>
         
+        <!-- Certificado -->
+        <StackPanel Spacing="8">
+            <TextBlock Text="Certificado / Evidencia (Opcional)" FontWeight="SemiBold"/>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button x:Name="UploadButton" Click="UploadButton_Click">
+                    <Button.Content>
+                         <StackPanel Orientation="Horizontal" Spacing="8">
+                             <FontIcon Glyph="&#xE898;"/>
+                             <TextBlock Text="Seleccionar Archivo"/>
+                         </StackPanel>
+                    </Button.Content>
+                </Button>
+                <TextBlock x:Name="FileNameText" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="250"
+                           Foreground="{ThemeResource SystemControlPageTextBaseMediumBrush}"/>
+            </StackPanel>
+        </StackPanel>
+        
         <ComboBox x:Name="ResultCombo"
                   Header="Resultado"
                   HorizontalAlignment="Stretch"
