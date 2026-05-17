@@ -106,5 +106,13 @@ El sistema organiza la información automáticamente:
 
 ---
 
+## 🌐 QMSFlowDoc v3 (Web en red local)
+
+Se ha iniciado la refactorización v3 para centralizar la aplicación en un único servidor accesible desde navegador dentro de la LAN. El nuevo proyecto `src/QMSFlowDoc.Web` reutiliza la capa de datos SQL Server y el almacenamiento documental central, expone login web, panel, listado documental, subida de borradores y descarga de versiones vigentes.
+
+Consulta `docs/QMSFlowDoc-V3-architecture.md` para la arquitectura, configuración de servidor y roadmap de migración desde la versión de escritorio.
+
+---
+
 # Soporte
 Para validar la instalación, revisa los logs de sincronización en `Base_datos/Logs` o utiliza la opción "Ver Log de Sincronización" en el menú de Configuración.
