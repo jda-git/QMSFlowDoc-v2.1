@@ -1,0 +1,392 @@
+using Microsoft.EntityFrameworkCore;
+using QMSFlowDoc.Application.Services.Inventory;
+using QMSFlowDoc.Domain.Entities;
+using QMSFlowDoc.Infrastructure.Persistence;
+using QMSFlowDoc.Shared.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace QMSFlowDoc.Infrastructure.Services.Inventory;
+
+public class InventoryService : IInventoryService
+{
+    private readonly QmsDbContext _context;
+
+    public InventoryService(QmsDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<IEnumerable<ReagentListDto>> GetReagentsAsync(bool? isActive = null, bool? isLowStock = null)
+    {
+        var query = _context.Reagents
+            .Include(r => r.Supplier)
+            .Include(r => r.Lots)
+            .AsQueryable();
+
+        if (isActive.HasValue)
+        {
+            query = isActive.Value
+                ? query.Where(r => r.Status == ReagentStatus.ACTIVO)
+                : query.Where(r => r.Status != ReagentStatus.ACTIVO);
+        }
+
+        var list = await query.OrderBy(r => r.Name)
+            .Select(r => new
+            {
+                r.Id,
+                r.Name,
+                r.Manufacturer,
+                r.Reference,
+                r.ReagentType,
+                r.Classification,
+                r.Status,
+                SupplierName = r.Supplier != null ? r.Supplier.Name : null,
+                r.MinStock,
+                r.TargetStock,
+                r.Fluorescence,
+                r.InternalCode,
+                Lots = r.Lots.Select(l => new
+                {
+                    l.Id,
+                    l.LotNumber,
+                    l.ExpiryDate,
+                    l.AvailableQty,
+                    l.Status
+                }).ToList()
+            })
+            .ToListAsync();
+
+        var dtos = list.Select(r =>
+        {
+            var activeLots = r.Lots.Where(l => l.AvailableQty > 0 && l.Status != LotStatus.CONSUMED).ToList();
+            var totalStock = activeLots.Sum(l => l.AvailableQty);
+            var nearestExpiry = activeLots.Any() ? activeLots.Min(l => l.ExpiryDate) : (DateTime?)null;
+
+            int expiryStatus = 0; // OK
+            if (nearestExpiry.HasValue)
+            {
+                var days = (nearestExpiry.Value.Date - DateTime.UtcNow.Date).TotalDays;
+                if (days < 0) expiryStatus = 2; // Expired
+                else if (days < 60) expiryStatus = 1; // Warning
+            }
+
+            return new ReagentListDto
+            {
+                Id = r.Id,
+                Name = r.Name,
+                Manufacturer = r.Manufacturer,
+                Reference = r.Reference,
+                ReagentType = r.ReagentType,
+                Classification = r.Classification,
+                Status = (QMSFlowDoc.Shared.Models.ReagentStatus)r.Status,
+                SupplierName = r.SupplierName,
+                TotalStock = totalStock,
+                MinStock = r.MinStock,
+                TargetStock = r.TargetStock,
+                Fluorescence = r.Fluorescence,
+                InternalCode = r.InternalCode,
+                NearestExpiry = nearestExpiry,
+                ExpiryStatus = expiryStatus,
+                AvailableLots = activeLots.Select(l => new LotSummaryDto
+                {
+                    Id = l.Id,
+                    LotNumber = l.LotNumber,
+                    ExpiryDate = l.ExpiryDate,
+                    Qty = l.AvailableQty
+                }).ToList()
+            };
+        });
+
+        if (isLowStock == true)
+        {
+            dtos = dtos.Where(r => r.TotalStock < r.MinStock);
+        }
+
+        return dtos.ToList();
+    }
+
+    public async Task<Reagent?> GetReagentByIdAsync(Guid id)
+    {
+        return await _context.Reagents
+            .Include(r => r.Supplier)
+            .Include(r => r.DefaultLocation)
+            .Include(r => r.Lots.OrderByDescending(l => l.CreatedAt))
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
+
+    public async Task<Reagent?> CreateReagentAsync(CreateReagentRequest request)
+    {
+        var reagent = new Reagent
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name,
+            Manufacturer = request.Manufacturer,
+            ReagentType = request.ReagentType,
+            Reference = request.Reference,
+            Classification = request.Classification,
+            StorageConditions = request.StorageConditions,
+            OpenShelfLifeDays = request.OpenShelfLifeDays,
+            MinStock = request.MinStock,
+            TargetStock = request.TargetStock,
+            ReorderQty = request.ReorderQty,
+            Status = ReagentStatus.ACTIVO,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Fluorescence = request.Fluorescence ?? "",
+            ManufacturerCode = request.ManufacturerCode,
+            InternalCode = request.InternalCode,
+            SupplierId = request.SupplierId,
+            DefaultLocationId = request.DefaultLocationId
+        };
+
+        _context.Reagents.Add(reagent);
+        await LogAuditAsync("CREATE", "Reagent", reagent.Id, $"Reactivo creado: {reagent.Name}", request.SupplierId, "Sistema");
+        await _context.SaveChangesAsync();
+        return reagent;
+    }
+
+    public async Task<bool> UpdateReagentAsync(Guid id, CreateReagentRequest request)
+    {
+        var r = await _context.Reagents.FindAsync(id);
+        if (r == null) return false;
+
+        r.Name = request.Name;
+        r.Manufacturer = request.Manufacturer;
+        r.ReagentType = request.ReagentType;
+        r.Reference = request.Reference;
+        r.Classification = request.Classification;
+        r.StorageConditions = request.StorageConditions;
+        r.OpenShelfLifeDays = request.OpenShelfLifeDays;
+        r.MinStock = request.MinStock;
+        r.TargetStock = request.TargetStock;
+        r.ReorderQty = request.ReorderQty;
+        r.Fluorescence = request.Fluorescence ?? "";
+        r.ManufacturerCode = request.ManufacturerCode;
+        r.InternalCode = request.InternalCode;
+        r.SupplierId = request.SupplierId;
+        r.DefaultLocationId = request.DefaultLocationId;
+        r.UpdatedAt = DateTime.UtcNow;
+
+        await LogAuditAsync("EDIT", "Reagent", r.Id, $"Reactivo actualizado: {r.Name}", null, "Sistema");
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<bool> UpdateReagentStatusAsync(Guid id, int status)
+    {
+        var r = await _context.Reagents.FindAsync(id);
+        if (r == null) return false;
+
+        var oldStatus = r.Status;
+        r.Status = (ReagentStatus)status;
+        r.UpdatedAt = DateTime.UtcNow;
+
+        await LogAuditAsync("STATUS_CHANGE", "Reagent", r.Id, $"Estado cambiado de {oldStatus} a {r.Status}", null, "Sistema");
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<List<ReagentLot>?> RegisterLotAsync(RegisterLotRequest request)
+    {
+        // Check if there is an existing active lot with same LotNumber and ExpiryDate for this Reagent
+        var existingLot = await _context.ReagentLots
+            .FirstOrDefaultAsync(l => l.ReagentId == request.ReagentId 
+                                   && l.LotNumber == request.LotNumber 
+                                   && l.ExpiryDate == request.ExpiryDate);
+
+        if (existingLot != null)
+        {
+            existingLot.ReceivedQty += request.ReceivedQty;
+            existingLot.AvailableQty += request.ReceivedQty;
+            
+            // If the lot was previously consumed, reactivate it since we added stock
+            if (existingLot.Status == LotStatus.CONSUMED)
+            {
+                existingLot.Status = LotStatus.RELEASED;
+            }
+
+            var movement = new InventoryMovement
+            {
+                Id = Guid.NewGuid(),
+                ReagentId = request.ReagentId,
+                ReagentLotId = existingLot.Id,
+                Qty = request.ReceivedQty,
+                MovementType = InventoryMovementType.IN,
+                Reason = $"Lote {request.LotNumber} adicionado (Fusión con lote existente)",
+                MovedAt = DateTime.UtcNow
+            };
+            _context.InventoryMovements.Add(movement);
+
+            await LogAuditAsync("REGISTER_LOT_ADDITION", "ReagentLot", existingLot.Id, $"Adición de stock a lote existente: {existingLot.LotNumber} (+{request.ReceivedQty} uds.)", request.UserId, "Sistema");
+            await _context.SaveChangesAsync();
+        }
+        else
+        {
+            var lot = new ReagentLot
+            {
+                Id = Guid.NewGuid(),
+                ReagentId = request.ReagentId,
+                LotNumber = request.LotNumber,
+                ReceivedQty = request.ReceivedQty,
+                AvailableQty = request.ReceivedQty,
+                ExpiryDate = request.ExpiryDate,
+                ReceivedDate = request.ReceivedDate,
+                LocationId = request.LocationId,
+                Status = LotStatus.RELEASED,
+                CreatedAt = DateTime.UtcNow,
+                PanelId = request.PanelId
+            };
+            _context.ReagentLots.Add(lot);
+
+            var movement = new InventoryMovement
+            {
+                Id = Guid.NewGuid(),
+                ReagentId = request.ReagentId,
+                ReagentLotId = lot.Id,
+                Qty = request.ReceivedQty,
+                MovementType = InventoryMovementType.IN,
+                Reason = $"Lote {request.LotNumber} registrado y liberado",
+                MovedAt = DateTime.UtcNow
+            };
+            _context.InventoryMovements.Add(movement);
+
+            await LogAuditAsync("REGISTER_LOT", "ReagentLot", lot.Id, $"Lote registrado: {lot.LotNumber} para reactivo {request.ReagentId}", request.UserId, "Sistema");
+            await _context.SaveChangesAsync();
+        }
+
+        return await _context.ReagentLots
+            .Where(l => l.ReagentId == request.ReagentId)
+            .OrderByDescending(l => l.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<bool> AdjustStockAsync(AdjustStockRequest request)
+    {
+        var lot = await _context.ReagentLots.FindAsync(request.ReagentLotId);
+        if (lot == null) return false;
+
+        lot.AvailableQty += request.Qty;
+        if (lot.AvailableQty <= 0)
+        {
+            lot.AvailableQty = 0;
+            lot.Status = LotStatus.CONSUMED;
+        }
+
+        var movement = new InventoryMovement
+        {
+            Id = Guid.NewGuid(),
+            ReagentId = lot.ReagentId,
+            ReagentLotId = lot.Id,
+            Qty = request.Qty,
+            MovementType = (InventoryMovementType)request.MovementType,
+            Reason = request.Reason,
+            MovedAt = DateTime.UtcNow,
+            Notes = request.Notes
+        };
+        _context.InventoryMovements.Add(movement);
+
+        await LogAuditAsync("ADJUST_STOCK", "ReagentLot", lot.Id, $"Stock ajustado en {request.Qty} unidades ({request.MovementType}). Motivo: {request.Reason}", request.UserId, "Sistema");
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<bool> UpdateLotStatusAsync(Guid lotId, LotStatus newStatus, Guid? userId, string username)
+    {
+        var lot = await _context.ReagentLots.FindAsync(lotId);
+        if (lot == null) return false;
+
+        var oldStatus = lot.Status;
+        lot.Status = newStatus;
+
+        var movement = new InventoryMovement
+        {
+            Id = Guid.NewGuid(),
+            ReagentId = lot.ReagentId,
+            ReagentLotId = lot.Id,
+            Qty = 0,
+            MovementType = InventoryMovementType.ADJUST,
+            Reason = $"Estado de lote cambiado de {oldStatus} a {newStatus}",
+            MovedAt = DateTime.UtcNow
+        };
+        _context.InventoryMovements.Add(movement);
+
+        await LogAuditAsync("LOT_STATUS_CHANGE", "ReagentLot", lot.Id, $"Estado de lote cambiado de {oldStatus} a {newStatus}", userId, username);
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<bool> DeleteReagentAsync(Guid id)
+    {
+        var r = await _context.Reagents.FindAsync(id);
+        if (r == null) return false;
+
+        r.IsDeleted = true;
+        r.UpdatedAt = DateTime.UtcNow;
+
+        await LogAuditAsync("DELETE", "Reagent", r.Id, $"Reactivo borrado de forma lógica: {r.Name}", null, "Sistema");
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<List<InventoryMovementDto>> GetMovementsAsync(
+        DateTime? from, DateTime? to, InventoryMovementType? type, Guid? reagentId)
+    {
+        var query = _context.InventoryMovements
+            .Include(m => m.Reagent)
+            .Include(m => m.ReagentLot)
+            .AsQueryable();
+
+        if (from.HasValue)
+            query = query.Where(m => m.MovedAt >= from.Value);
+        if (to.HasValue)
+            query = query.Where(m => m.MovedAt <= to.Value);
+        if (type.HasValue)
+            query = query.Where(m => m.MovementType == type.Value);
+        if (reagentId.HasValue)
+            query = query.Where(m => m.ReagentId == reagentId.Value);
+
+        return await query
+            .OrderByDescending(m => m.MovedAt)
+            .Take(500)
+            .Select(m => new InventoryMovementDto(
+                m.Id,
+                m.MovedAt,
+                "Sistema", 
+                m.Reagent != null ? m.Reagent.Name : "?",
+                m.Reagent != null ? m.Reagent.Manufacturer : null,
+                m.Reagent != null ? m.Reagent.Fluorescence : null,
+                m.MovementType.ToString(),
+                m.Qty,
+                m.ReagentLot != null ? m.ReagentLot.LotNumber : null,
+                m.ReagentLot != null ? m.ReagentLot.ExpiryDate : null,
+                m.Reason ?? ""
+            ))
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<StorageLocation>> GetStorageLocationsAsync()
+    {
+        return await _context.StorageLocations.OrderBy(l => l.Name).ToListAsync();
+    }
+
+    public async Task<IEnumerable<Supplier>> GetSuppliersAsync()
+    {
+        return await _context.Suppliers.Where(s => !s.IsDeleted).OrderBy(s => s.Name).ToListAsync();
+    }
+
+    private async Task LogAuditAsync(string action, string entityType, Guid? entityId, string details, Guid? userId, string username)
+    {
+        var audit = new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            Details = details,
+            UserId = userId ?? Guid.Empty,
+            UserName = username ?? "Sistema",
+            Timestamp = DateTime.UtcNow,
+            MachineName = Environment.MachineName,
+            Result = "Success"
+        };
+        _context.AuditLogs.Add(audit);
+    }
+}

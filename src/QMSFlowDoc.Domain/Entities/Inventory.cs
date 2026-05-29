@@ -14,12 +14,13 @@ public enum ReagentStatus
 
 public enum LotStatus
 {
-    QUARANTINE,
-    RELEASED,
-    BLOCKED,
-    CONSUMED,
-    EXPIRED,
-    RECALLED
+    QUARANTINE = 0,
+    RELEASED = 1,
+    BLOCKED = 2,
+    CONSUMED = 3,
+    EXPIRED = 4,
+    RECALLED = 5,
+    IN_USE = 6
 }
 
 public enum InventoryMovementType
