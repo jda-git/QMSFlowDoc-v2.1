@@ -1,0 +1,761 @@
+@page "/config"
+@rendermode InteractiveServer
+@using QMSFlowDoc.Application.Services.Identity
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IUserService UserService
+@inject IPermissionService PermissionService
+@inject IJSRuntime JS
+
+<PageTitle>Configuración del Sistema - QMSFlowDoc</PageTitle>
+
+<div class="config-container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold text-dark mb-1"><i class="bi bi-sliders text-primary me-2"></i>Configuración del Sistema</h1>
+            <p class="text-muted mb-0">Gestión de usuarios del laboratorio, niveles de acceso y matriz de permisos reglamentaria ISO 15189.</p>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs custom-tabs mb-4 border-bottom-0">
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == "general" ? "active text-primary fw-semibold" : "text-secondary")"
+                    @onclick='() => SetTab("general")'>
+                <i class="bi bi-gear-fill me-2"></i>General
+            </button>
+        </li>
+        @if (isAdmin)
+        {
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "users" ? "active text-primary fw-semibold" : "text-secondary")"
+                        @onclick='() => SetTab("users")'>
+                    <i class="bi bi-people-fill me-2"></i>Gestión de Usuarios
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "permissions" ? "active text-primary fw-semibold" : "text-secondary")"
+                        @onclick='() => SetTab("permissions")'>
+                    <i class="bi bi-shield-lock-fill me-2"></i>Niveles de Permisos
+                </button>
+            </li>
+        }
+    </ul>
+
+    <!-- Main Content Card -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white border">
+        @if (activeTab == "general")
+        {
+            <!-- General Settings Tab -->
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="fw-bold mb-3 text-secondary">Información del Laboratorio</h5>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Nombre de la Organización</label>
+                        <input type="text" class="form-control form-control-premium" value="Laboratorio Clínico Central" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Norma de Acreditación Principal</label>
+                        <input type="text" class="form-control form-control-premium" value="UNE-EN ISO 15189:2023" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Código de Acreditación</label>
+                        <input type="text" class="form-control form-control-premium" value="1234/LE2345" readonly />
+                    </div>
+                </div>
+                <div class="col-md-6 border-start ps-4">
+                    <h5 class="fw-bold mb-3 text-secondary">Estado del Sistema</h5>
+                    <div class="card bg-light border-0 p-3 rounded-3 mb-3">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-success fs-3 me-3"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold">Base de Datos Conectada</h6>
+                                <span class="text-muted small">SQLite en modo local cifrado</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card bg-light border-0 p-3 rounded-3">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-shield-check text-info fs-3 me-3"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold">Cumplimiento ISO 15189</h6>
+                                <span class="text-muted small">Trazabilidad de validadores activa</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (activeTab == "users" && isAdmin)
+        {
+            <!-- Users Tab -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="input-group w-50">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control form-control-premium border-start-0 ps-1" 
+                           placeholder="Buscar usuario por nombre o correo..." @bind="userSearchQuery" @bind:event="oninput" />
+                </div>
+                <button class="btn btn-premium px-4" @onclick="OpenAddUserModal">
+                    <i class="bi bi-person-plus-fill me-2"></i> Registrar Usuario
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(userSuccessMessage))
+            {
+                <div class="alert alert-success py-2 small mb-3">
+                    <i class="bi bi-check-circle-fill me-2"></i>@userSuccessMessage
+                </div>
+            }
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light border-bottom text-muted small text-uppercase">
+                        <tr>
+                            <th class="ps-3">Usuario / Correo</th>
+                            <th>Nombre Completo</th>
+                            <th>Nivel de Acceso</th>
+                            <th>Estado</th>
+                            <th>F. Registro</th>
+                            <th class="text-end pe-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in FilteredUsers)
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    <div>
+                                        <span class="fw-semibold text-dark d-block">@@@u.UserName</span>
+                                        <span class="text-muted small" style="font-size: 0.75rem;">@u.Email</span>
+                                    </div>
+                                </td>
+                                <td class="fw-medium text-dark">@u.FullName</td>
+                                <td>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-2.5 py-1 text-capitalize">
+                                        <i class="bi bi-shield-check me-1"></i>@u.Role
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill @(u.IsActive ? "bg-success bg-opacity-10 text-success border border-success border-opacity-20" : "bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20")">
+                                        @(u.IsActive ? "Activo" : "Inactivo")
+                                    </span>
+                                </td>
+                                <td class="text-muted small">@u.CreatedAt.ToString("dd/MM/yyyy")</td>
+                                <td class="text-end pe-3">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-3 px-3 me-1" @onclick="() => OpenEditUserModal(u)" title="Editar Perfil">
+                                        <i class="bi bi-pencil-square me-1"></i> Perfil
+                                    </button>
+                                    <button class="btn btn-light btn-sm rounded-3 border px-2.5" @onclick="() => OpenResetPasswordModal(u)" title="Restablecer Clave">
+                                        <i class="bi bi-key-fill"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (activeTab == "permissions" && isAdmin)
+        {
+            <!-- Permissions Settings Tab -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">Matriz de Configuración de Accesos</h5>
+                    <span class="text-muted small">Configure las acciones permitidas para cada rol en los módulos principales del gestor.</span>
+                </div>
+                <button class="btn btn-outline-success btn-sm px-3" @onclick="OpenAddRoleModal">
+                    <i class="bi bi-shield-plus me-1"></i> Crear Rol Personalizado
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(permissionsSuccessMessage))
+            {
+                <div class="alert alert-success py-2 small mb-3">
+                    <i class="bi bi-check-circle-fill me-2"></i>@permissionsSuccessMessage
+                </div>
+            }
+
+            <div class="sections-permissions-wrapper">
+                @foreach (var sectionGroup in matrixGroupedBySection)
+                {
+                    <div class="card border border-light shadow-none rounded-3 p-3 mb-4 bg-light bg-opacity-30">
+                        <h6 class="fw-bold text-primary mb-3">
+                            <i class="bi bi-folder-symlink-fill me-2"></i>Módulo: @GetSectionLabel(sectionGroup.Key)
+                        </h6>
+                        <table class="table table-sm table-bordered bg-white align-middle text-center mb-0">
+                            <thead class="bg-light text-muted small fw-semibold">
+                                <tr>
+                                    <th class="text-start ps-3" style="width: 30%;">Nivel de Permisos / Rol</th>
+                                    <th>Leer</th>
+                                    <th>Crear</th>
+                                    <th>Editar</th>
+                                    <th>Eliminar</th>
+                                    <th>Imprimir/Exportar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var rp in sectionGroup.Value)
+                                {
+                                    <tr>
+                                        <td class="text-start ps-3 fw-semibold text-dark text-capitalize">
+                                            @rp.RoleName
+                                            @if (rp.RoleName == "Administrador")
+                                            {
+                                                <span class="text-muted small font-normal ms-1">(Acceso total fijo)</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input" @bind="rp.CanRead" disabled='@(rp.RoleName == "Administrador")' />
+                                        </td>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input" @bind="rp.CanCreate" disabled='@(rp.RoleName == "Administrador")' />
+                                        </td>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input" @bind="rp.CanEdit" disabled='@(rp.RoleName == "Administrador")' />
+                                        </td>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input" @bind="rp.CanDelete" disabled='@(rp.RoleName == "Administrador")' />
+                                        </td>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input" @bind="rp.CanPrint" disabled='@(rp.RoleName == "Administrador")' />
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-primary px-5 py-2.5 rounded-3 fw-bold" @onclick="SavePermissionsMatrix">
+                    <i class="bi bi-save-fill me-2"></i> Guardar Configuración de Permisos
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- MODAL: REGISTRAR USUARIO -->
+@if (showAddUserModal && isAdmin)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content card shadow border-0 rounded-4 w-100">
+                <div class="card-header bg-primary text-white py-3 border-0 rounded-top-4 d-flex justify-content-between">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-person-plus-fill me-2"></i>Registrar Nuevo Usuario
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showAddUserModal = false"></button>
+                </div>
+                <div class="card-body p-4">
+                    @if (!string.IsNullOrEmpty(userModalError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@userModalError
+                        </div>
+                    }
+                    <EditForm Model="createUserModel" OnValidSubmit="SaveNewUser">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Nombre de Usuario (Login)</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="createUserModel.UserName" placeholder="Ej. jperez" required />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Nombre Completo</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="createUserModel.FullName" placeholder="Ej. Juan Pérez" required />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Correo Electrónico</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="createUserModel.Email" type="email" placeholder="Ej. jperez@laboratorio.com" required />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Contraseña Inicial</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="createUserModel.Password" type="password" placeholder="Contraseña de al menos 6 caracteres" required />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Rol / Nivel de Acceso</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="createUserModel.Role">
+                                    <option value="">-- Seleccionar Nivel --</option>
+                                    @foreach (var r in roles)
+                                    {
+                                        <option value="@r.Name">@r.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showAddUserModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-primary px-4">Guardar Usuario</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: EDITAR PERFIL DE USUARIO -->
+@if (showEditUserModal && isAdmin)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content card shadow border-0 rounded-4 w-100">
+                <div class="card-header bg-primary text-white py-3 border-0 rounded-top-4 d-flex justify-content-between">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-pencil-square me-2"></i>Editar Perfil de Usuario
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showEditUserModal = false"></button>
+                </div>
+                <div class="card-body p-4">
+                    @if (!string.IsNullOrEmpty(userModalError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@userModalError
+                        </div>
+                    }
+                    <EditForm Model="editUserModel" OnValidSubmit="SaveEditedUser">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <span class="text-muted small d-block mb-1">Nombre de Usuario</span>
+                                <h6 class="fw-bold">@@@selectedUser?.UserName</h6>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Nombre Completo</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="editUserModel.FullName" required />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Correo Electrónico</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="editUserModel.Email" type="email" required />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Rol / Nivel de Acceso</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="editUserModel.Role">
+                                    @foreach (var r in roles)
+                                    {
+                                        <option value="@r.Name">@r.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch pt-2">
+                                    <InputCheckbox class="form-check-input" id="editUserIsActive" @bind-Value="editUserModel.IsActive" />
+                                    <label class="form-check-label text-muted small" for="editUserIsActive">Cuenta de Usuario Activa</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showEditUserModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-primary px-4">Guardar Cambios</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: RESTABLECER CONTRASEÑA -->
+@if (showResetPasswordModal && isAdmin)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content card shadow border-0 rounded-4">
+                <div class="card-header bg-warning text-dark py-3 border-0 rounded-top-4 d-flex justify-content-between">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="bi bi-key-fill me-2"></i>Restablecer Contraseña
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="() => showResetPasswordModal = false"></button>
+                </div>
+                <div class="card-body p-3">
+                    @if (!string.IsNullOrEmpty(userModalError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@userModalError
+                        </div>
+                    }
+                    <p class="small text-secondary mb-3">
+                        Establezca una nueva contraseña para la cuenta del usuario <strong>@@@selectedUser?.UserName</strong>.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-medium">Nueva Contraseña</label>
+                        <input type="password" class="form-control form-control-premium" @bind="newPasswordVal" placeholder="Min. 6 caracteres" />
+                    </div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-light btn-sm" @onclick="() => showResetPasswordModal = false">Cancelar</button>
+                        <button type="button" class="btn btn-warning btn-sm text-dark px-3 fw-bold" @onclick="SaveNewPassword">Confirmar Clave</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: CREAR ROL PERSONALIZADO -->
+@if (showAddRoleModal && isAdmin)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content card shadow border-0 rounded-4 w-100">
+                <div class="card-header bg-success text-white py-3 border-0 rounded-top-4 d-flex justify-content-between">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-shield-plus me-2"></i>Crear Rol / Nivel Personalizado
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showAddRoleModal = false"></button>
+                </div>
+                <div class="card-body p-4">
+                    @if (!string.IsNullOrEmpty(roleModalError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@roleModalError
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-secondary small">Nombre del Rol</label>
+                        <input type="text" class="form-control form-control-premium" @bind="newRoleName" placeholder="Ej. Coordinador de Calidad" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-secondary small">Descripción (opcional)</label>
+                        <textarea class="form-control form-control-premium" @bind="newRoleDescription" placeholder="Ej. Rol personalizado para coordinadores..." rows="2"></textarea>
+                    </div>
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <button type="button" class="btn btn-light" @onclick="() => showAddRoleModal = false">Cancelar</button>
+                        <button type="button" class="btn btn-success px-4 text-white" @onclick="SaveNewRole">Crear Rol</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .custom-tabs .nav-link {
+        border: none;
+        border-bottom: 3px solid transparent;
+        border-radius: 0;
+        padding: 0.75rem 1.25rem;
+    }
+
+    .custom-tabs .nav-link.active {
+        border-bottom-color: #0d6efd;
+        background-color: transparent;
+    }
+
+    .btn-premium {
+        background: linear-gradient(135deg, #0d6efd 0%, #084298 100%);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        transition: opacity 0.2s;
+    }
+
+    .btn-premium:hover {
+        opacity: 0.95;
+        color: white;
+    }
+
+    .form-control-premium, .form-select-premium {
+        border-radius: 0.5rem;
+        border: 1px solid #ced4da;
+        padding: 0.6rem 0.8rem;
+    }
+
+    .form-control-premium:focus, .form-select-premium:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    }
+</style>
+
+@code {
+    private string activeTab = "general";
+    private bool isAdmin = false;
+
+    private List<UserDto> users = new();
+    private List<RoleDto> roles = new();
+    private List<RolePermissionViewModel> permissions = new();
+    private Dictionary<string, List<RolePermissionViewModel>> matrixGroupedBySection = new();
+
+    private string userSearchQuery = string.Empty;
+
+    // Modals visibility toggles
+    private bool showAddUserModal = false;
+    private bool showEditUserModal = false;
+    private bool showResetPasswordModal = false;
+    private bool showAddRoleModal = false;
+
+    // Success and error messages
+    private string? userSuccessMessage;
+    private string? permissionsSuccessMessage;
+    private string? userModalError;
+    private string? roleModalError;
+
+    // Form Models
+    private CreateUserModel createUserModel = new();
+    private EditUserModel editUserModel = new();
+    private UserDto? selectedUser;
+    private string newPasswordVal = string.Empty;
+
+    // New Role Form variables
+    private string newRoleName = string.Empty;
+    private string? newRoleDescription;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            isAdmin = user.IsInRole("Administrador");
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (isAdmin)
+        {
+            users = await UserService.GetUsersAsync();
+            roles = await UserService.GetRolesAsync();
+            var dtos = await PermissionService.GetRolePermissionsAsync();
+            permissions = dtos.Select(p => new RolePermissionViewModel
+            {
+                Id = p.Id,
+                RoleId = p.RoleId,
+                RoleName = p.RoleName,
+                Section = p.Section,
+                CanRead = p.CanRead,
+                CanCreate = p.CanCreate,
+                CanEdit = p.CanEdit,
+                CanDelete = p.CanDelete,
+                CanPrint = p.CanPrint
+            }).ToList();
+            
+            // Group permissions by section
+            matrixGroupedBySection = permissions
+                .GroupBy(p => p.Section)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        userSuccessMessage = null;
+        permissionsSuccessMessage = null;
+    }
+
+    private IEnumerable<UserDto> FilteredUsers =>
+        users.Where(u =>
+            string.IsNullOrEmpty(userSearchQuery) ||
+            u.UserName.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+            u.FullName.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+            u.Email.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase)
+        );
+
+    private void OpenAddUserModal()
+    {
+        createUserModel = new CreateUserModel();
+        userModalError = null;
+        showAddUserModal = true;
+    }
+
+    private async Task SaveNewUser()
+    {
+        if (string.IsNullOrEmpty(createUserModel.Role))
+        {
+            userModalError = "Debe asignar un nivel de acceso/rol al usuario.";
+            return;
+        }
+
+        var req = new CreateUserRequest(
+            createUserModel.UserName,
+            createUserModel.Email,
+            createUserModel.FullName,
+            createUserModel.Password,
+            createUserModel.Role
+        );
+
+        var success = await UserService.CreateUserAsync(req);
+        if (success)
+        {
+            showAddUserModal = false;
+            userSuccessMessage = $"Usuario @{createUserModel.UserName} registrado con éxito.";
+            await LoadData();
+        }
+        else
+        {
+            userModalError = "No se pudo registrar el usuario. Compruebe que el nombre de usuario no esté duplicado y que la contraseña cumpla los requisitos.";
+        }
+    }
+
+    private void OpenEditUserModal(UserDto u)
+    {
+        selectedUser = u;
+        editUserModel = new EditUserModel
+        {
+            Email = u.Email,
+            FullName = u.FullName,
+            Role = u.Role,
+            IsActive = u.IsActive
+        };
+        userModalError = null;
+        showEditUserModal = true;
+    }
+
+    private async Task SaveEditedUser()
+    {
+        if (selectedUser == null) return;
+
+        var req = new UpdateUserRequest(
+            editUserModel.Email,
+            editUserModel.FullName,
+            editUserModel.Role,
+            editUserModel.IsActive
+        );
+
+        var success = await UserService.UpdateUserAsync(selectedUser.Id, req);
+        if (success)
+        {
+            showEditUserModal = false;
+            userSuccessMessage = $"Perfil de @{selectedUser.UserName} actualizado con éxito.";
+            await LoadData();
+        }
+        else
+        {
+            userModalError = "No se pudieron guardar los cambios en el perfil.";
+        }
+    }
+
+    private void OpenResetPasswordModal(UserDto u)
+    {
+        selectedUser = u;
+        newPasswordVal = string.Empty;
+        userModalError = null;
+        showResetPasswordModal = true;
+    }
+
+    private async Task SaveNewPassword()
+    {
+        if (selectedUser == null) return;
+        if (string.IsNullOrEmpty(newPasswordVal) || newPasswordVal.Length < 6)
+        {
+            userModalError = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        var success = await UserService.ResetPasswordAsync(selectedUser.Id, newPasswordVal);
+        if (success)
+        {
+            showResetPasswordModal = false;
+            userSuccessMessage = $"Contraseña de @{selectedUser.UserName} restablecida correctamente.";
+        }
+        else
+        {
+            userModalError = "Ocurrió un error al restablecer la contraseña.";
+        }
+    }
+
+    private void OpenAddRoleModal()
+    {
+        newRoleName = string.Empty;
+        newRoleDescription = string.Empty;
+        roleModalError = null;
+        showAddRoleModal = true;
+    }
+
+    private async Task SaveNewRole()
+    {
+        if (string.IsNullOrWhiteSpace(newRoleName))
+        {
+            roleModalError = "El nombre del rol es obligatorio.";
+            return;
+        }
+
+        var success = await UserService.CreateRoleAsync(newRoleName.Trim(), newRoleDescription);
+        if (success)
+        {
+            showAddRoleModal = false;
+            permissionsSuccessMessage = $"Rol '{newRoleName}' creado correctamente.";
+            await LoadData();
+        }
+        else
+        {
+            roleModalError = "No se pudo crear el rol. Compruebe si ya existe un rol con ese nombre.";
+        }
+    }
+
+    private async Task SavePermissionsMatrix()
+    {
+        try
+        {
+            var dtos = permissions.Select(p => new RolePermissionDto(
+                p.Id,
+                p.RoleId,
+                p.RoleName,
+                p.Section,
+                p.CanRead,
+                p.CanCreate,
+                p.CanEdit,
+                p.CanDelete,
+                p.CanPrint
+            )).ToList();
+            await PermissionService.SaveRolePermissionsAsync(dtos);
+            permissionsSuccessMessage = "Matriz de permisos guardada con éxito.";
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            permissionsSuccessMessage = $"Error al guardar la matriz: {ex.Message}";
+        }
+    }
+
+    private string GetSectionLabel(string key)
+    {
+        return key switch
+        {
+            "Documents" => "Gestor Documental (ISO 15189)",
+            "Inventory" => "Inventario y Reactivos",
+            "Staff" => "Personal y Formación (Expedientes)",
+            "Quality" => "No Conformidades y Calidad (ISO 15189)",
+            _ => key
+        };
+    }
+
+    // INTERNAL MODELS
+    public class RolePermissionViewModel
+    {
+        public Guid Id { get; set; }
+        public Guid RoleId { get; set; }
+        public string RoleName { get; set; } = string.Empty;
+        public string Section { get; set; } = string.Empty;
+        public bool CanRead { get; set; }
+        public bool CanCreate { get; set; }
+        public bool CanEdit { get; set; }
+        public bool CanDelete { get; set; }
+        public bool CanPrint { get; set; }
+    }
+
+    public class CreateUserModel
+    {
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+    }
+
+    public class EditUserModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+    }
+}

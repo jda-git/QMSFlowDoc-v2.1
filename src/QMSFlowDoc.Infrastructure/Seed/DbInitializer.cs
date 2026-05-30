@@ -6,6 +6,7 @@ using QMSFlowDoc.Infrastructure.Persistence;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace QMSFlowDoc.Infrastructure.Seed
@@ -37,8 +38,8 @@ namespace QMSFlowDoc.Infrastructure.Seed
             var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-            // 2. Seed Default Roles (needed if no legacy DB, or as fallback)
-            string[] roleNames = { "Administrador", "Facultativo", "Técnico" };
+            // 1. Seed Default Roles (needed if no legacy DB, or as fallback)
+            string[] roleNames = { "Administrador", "Facultativo", "Técnico", "Responsable calidad", "Auditor" };
             foreach (var roleName in roleNames)
             {
                 if (!await roleManager.RoleExistsAsync(roleName))
@@ -49,6 +50,47 @@ namespace QMSFlowDoc.Infrastructure.Seed
                     });
                 }
             }
+
+            // 2. Map and cleanup legacy roles if they exist
+            var legacyMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Staff", "Técnico" },
+                { "Quality", "Responsable calidad" },
+                { "Consultor", "Auditor" },
+                { "Manager", "Responsable calidad" }
+            };
+
+            foreach (var mapping in legacyMappings)
+            {
+                var legacyRoleName = mapping.Key;
+                var targetRoleName = mapping.Value;
+
+                var legacyRole = await roleManager.FindByNameAsync(legacyRoleName);
+                if (legacyRole != null)
+                {
+                    // Map all users in the legacy role to the new role
+                    var usersInLegacyRole = await userManager.GetUsersInRoleAsync(legacyRoleName);
+                    foreach (var user in usersInLegacyRole)
+                    {
+                        if (!await userManager.IsInRoleAsync(user, targetRoleName))
+                        {
+                            await userManager.AddToRoleAsync(user, targetRoleName);
+                        }
+                        await userManager.RemoveFromRoleAsync(user, legacyRoleName);
+                    }
+
+                    // Delete associated permissions in RolePermissions table
+                    var rpEntries = await context.RolePermissions.Where(rp => rp.RoleId == legacyRole.Id).ToListAsync();
+                    if (rpEntries.Any())
+                    {
+                        context.RolePermissions.RemoveRange(rpEntries);
+                    }
+
+                    // Delete the legacy role
+                    await roleManager.DeleteAsync(legacyRole);
+                }
+            }
+            await context.SaveChangesAsync();
 
             // 3. Check for automatic legacy database migration
             const string legacyDbPath = @"C:\Users\josea\Documents\Antigravity\QMSFlowDoc V2\QMS\Base_datos\qmsflowdoc.db";
@@ -72,8 +114,9 @@ namespace QMSFlowDoc.Infrastructure.Seed
                             await context.Database.ExecuteSqlRawAsync(@"
                                 INSERT OR IGNORE INTO Roles (Id, Name, NormalizedName, ConcurrencyStamp, Description)
                                 SELECT Id, RoleName, UPPER(RoleName), 'MIGRATED_CONCURRENCY_STAMP', Description
-                                FROM legacy.Roles;");
-                            Console.WriteLine("✔ Migrated Roles successfully.");
+                                FROM legacy.Roles
+                                WHERE UPPER(RoleName) NOT IN ('STAFF', 'QUALITY', 'CONSULTOR', 'MANAGER');");
+                            Console.WriteLine("✔ Migrated Roles successfully (filtered legacy roles).");
                         }
                         catch (Exception ex)
                         {
@@ -106,10 +149,17 @@ namespace QMSFlowDoc.Infrastructure.Seed
                         {
                             await context.Database.ExecuteSqlRawAsync(@"
                                 INSERT OR IGNORE INTO UserRoles (UserId, RoleId)
-                                SELECT ur.UserId, COALESCE(r_target.Id, ur.RoleId)
+                                SELECT ur.UserId, r_target.Id
                                 FROM legacy.UserRoles ur
-                                LEFT JOIN legacy.Roles r_legacy ON ur.RoleId = r_legacy.Id
-                                LEFT JOIN Roles r_target ON UPPER(r_legacy.RoleName) = r_target.NormalizedName;");
+                                JOIN legacy.Roles r_legacy ON ur.RoleId = r_legacy.Id
+                                JOIN Roles r_target ON r_target.NormalizedName = 
+                                    CASE UPPER(r_legacy.RoleName)
+                                        WHEN 'STAFF' THEN 'TÉCNICO'
+                                        WHEN 'QUALITY' THEN 'RESPONSABLE CALIDAD'
+                                        WHEN 'CONSULTOR' THEN 'AUDITOR'
+                                        WHEN 'MANAGER' THEN 'RESPONSABLE CALIDAD'
+                                        ELSE UPPER(r_legacy.RoleName)
+                                    END;");
                             Console.WriteLine("✔ Migrated UserRoles successfully with role mapping.");
                         }
                         catch (Exception ex)
@@ -272,6 +322,126 @@ namespace QMSFlowDoc.Infrastructure.Seed
                     await userManager.AddToRoleAsync(admin, "Administrador");
                 }
             }
+
+            // 5. Seed default RolePermissions
+            await SeedDefaultRolePermissionsAsync(context, roleManager);
+        }
+
+        private static async Task SeedDefaultRolePermissionsAsync(QmsDbContext context, RoleManager<ApplicationRole> roleManager)
+        {
+            var sections = new[] { "Documents", "Inventory", "Staff", "Quality" };
+            
+            var roles = await roleManager.Roles.ToListAsync();
+            foreach (var role in roles)
+            {
+                foreach (var section in sections)
+                {
+                    var exists = await context.RolePermissions.AnyAsync(rp => rp.RoleId == role.Id && rp.Section == section);
+                    if (!exists)
+                    {
+                        var rp = new QMSFlowDoc.Domain.Identity.RolePermission
+                        {
+                            Id = Guid.NewGuid(),
+                            RoleId = role.Id,
+                            Section = section
+                        };
+
+                        if (role.Name == "Administrador")
+                        {
+                            rp.CanRead = true;
+                            rp.CanCreate = true;
+                            rp.CanEdit = true;
+                            rp.CanDelete = true;
+                            rp.CanPrint = true;
+                        }
+                        else if (role.Name == "Responsable calidad")
+                        {
+                            rp.CanRead = true;
+                            rp.CanPrint = true;
+                            rp.CanCreate = true;
+                            rp.CanEdit = true;
+                            rp.CanDelete = false;
+                        }
+                        else if (role.Name == "Facultativo")
+                        {
+                            rp.CanRead = true;
+                            rp.CanPrint = true;
+                            if (section == "Documents")
+                            {
+                                rp.CanCreate = false;
+                                rp.CanEdit = false;
+                                rp.CanDelete = false;
+                            }
+                            else
+                            {
+                                rp.CanCreate = true;
+                                rp.CanEdit = true;
+                                rp.CanDelete = false;
+                            }
+                        }
+                        else if (role.Name == "Técnico")
+                        {
+                            rp.CanRead = true;
+                            if (section == "Documents")
+                            {
+                                rp.CanPrint = false;
+                                rp.CanCreate = false;
+                                rp.CanEdit = false;
+                                rp.CanDelete = false;
+                            }
+                            else if (section == "Inventory")
+                            {
+                                rp.CanPrint = true;
+                                rp.CanCreate = false;
+                                rp.CanEdit = true;
+                                rp.CanDelete = false;
+                            }
+                            else if (section == "Quality")
+                            {
+                                rp.CanPrint = true;
+                                rp.CanCreate = true;
+                                rp.CanEdit = true;
+                                rp.CanDelete = false;
+                            }
+                            else
+                            {
+                                rp.CanPrint = false;
+                                rp.CanCreate = false;
+                                rp.CanEdit = false;
+                                rp.CanDelete = false;
+                            }
+                        }
+                        else if (role.Name == "Auditor")
+                        {
+                            rp.CanRead = true;
+                            if (section == "Documents" || section == "Quality")
+                            {
+                                rp.CanPrint = true;
+                                rp.CanCreate = false;
+                                rp.CanEdit = false;
+                                rp.CanDelete = false;
+                            }
+                            else if (section == "Inventory")
+                            {
+                                rp.CanPrint = true;
+                                rp.CanCreate = true;
+                                rp.CanEdit = true;
+                                rp.CanDelete = false;
+                            }
+                            else
+                            {
+                                rp.CanPrint = false;
+                                rp.CanCreate = false;
+                                rp.CanEdit = false;
+                                rp.CanDelete = false;
+                            }
+                        }
+
+                        context.RolePermissions.Add(rp);
+                    }
+                }
+            }
+            await context.SaveChangesAsync();
         }
     }
 }

@@ -50,6 +50,8 @@ public class Nonconformity
     
     public NCStatus Status { get; set; } = NCStatus.OPEN;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ClosedAt { get; set; }
+    public Guid? ClosedByUserId { get; set; }
 
     // V2: Optimistic concurrency
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
@@ -65,6 +67,7 @@ public class CapaAction
     public CAPAActionType ActionType { get; set; }
     public string Description { get; set; } = string.Empty;
     public Guid? OwnerUserId { get; set; }
+    public Guid? ClosedByUserId { get; set; }
     public DateTime? DueDate { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? EffectivenessCheck { get; set; }
@@ -103,6 +106,7 @@ public class Complaint
     public string? CorrectiveAction { get; set; }
     public ComplaintStatus Status { get; set; } = ComplaintStatus.OPEN;
     public DateTime? ClosedAt { get; set; }
+    public Guid? ClosedByUserId { get; set; }
 
     // V2: Optimistic concurrency
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();

@@ -124,7 +124,7 @@ public sealed partial class StaffEditorView : Page
             var department = DepartmentBox.Text.Trim();
             var hired = HiredDatePicker.Date.DateTime;
             var roleItem = RoleCombo.SelectedItem as ComboBoxItem;
-            var roleName = roleItem?.Tag?.ToString() ?? "Staff";
+            var roleName = roleItem?.Tag?.ToString() ?? "Técnico";
             var isActive = IsActiveCheck.IsChecked ?? true;
 
             if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(username))

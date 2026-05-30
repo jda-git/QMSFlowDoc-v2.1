@@ -6,15 +6,29 @@
 @using QMSFlowDoc.Shared.DTOs
 @using Microsoft.AspNetCore.Authorization
 @using System.IO
+@using QMSFlowDoc.Application.Services.Identity
 @attribute [Authorize]
 @inject IDocumentService DocumentService
 @inject IFolderService FolderService
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject IPermissionService PermissionService
 
 <PageTitle>Gestor Documental - QMSFlowDoc</PageTitle>
 
-<div class="documents-container py-4">
+@if (!canRead)
+{
+    <div class="documents-container py-4">
+        <div class="alert alert-danger p-4 rounded-4 shadow-sm border border-danger border-opacity-25 mt-4 text-center">
+            <i class="bi bi-shield-slash-fill fs-1 text-danger d-block mb-3"></i>
+            <h4 class="fw-bold">Acceso No Autorizado</h4>
+            <p class="text-muted mb-0">Su rol de usuario no tiene permisos de lectura para acceder al Gestor Documental.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="documents-container py-4">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -22,9 +36,12 @@
             <p class="text-muted mb-0">Control de calidad y cumplimiento ISO 15189 para documentos de laboratorio</p>
         </div>
         <div>
-            <button class="btn btn-premium px-4" @onclick="OpenAddDocumentModal">
-                <i class="bi bi-file-earmark-plus me-2"></i> Nuevo Documento
-            </button>
+            @if (canCreate)
+            {
+                <button class="btn btn-premium px-4" @onclick="OpenAddDocumentModal">
+                    <i class="bi bi-file-earmark-plus me-2"></i> Nuevo Documento
+                </button>
+            }
         </div>
     </div>
 
@@ -35,9 +52,12 @@
             <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0 text-secondary"><i class="bi bi-folder me-2"></i>Carpetas</h5>
-                    <button class="btn btn-sm btn-outline-primary border-0 rounded-circle" @onclick="OpenAddFolderModal" title="Nueva Carpeta">
-                        <i class="bi bi-folder-plus fs-5"></i>
-                    </button>
+                    @if (canCreate)
+                    {
+                        <button class="btn btn-sm btn-outline-primary border-0 rounded-circle" @onclick="OpenAddFolderModal" title="Nueva Carpeta">
+                            <i class="bi bi-folder-plus fs-5"></i>
+                        </button>
+                    }
                 </div>
 
                 <!-- Folders List -->
@@ -65,11 +85,17 @@
                                 <span class="text-truncate">@folder.Name</span>
                                 <span class="badge rounded-pill bg-light text-dark ms-auto font-monospace">@folder.DocumentCount</span>
                             </button>
-                            @if (isAdmin)
+                            @if (canEdit || canDelete)
                             {
                                 <div class="folder-actions pe-2">
-                                    <button class="btn btn-sm btn-link text-muted p-0 me-1" @onclick="() => OpenRenameFolderModal(folder)" @onclick:stopPropagation="true" title="Renombrar"><i class="bi bi-pencil"></i></button>
-                                    <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => DeleteFolder(folder.Id)" @onclick:stopPropagation="true" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                    @if (canEdit)
+                                    {
+                                        <button class="btn btn-sm btn-link text-muted p-0 me-1" @onclick="() => OpenRenameFolderModal(folder)" @onclick:stopPropagation="true" title="Renombrar"><i class="bi bi-pencil"></i></button>
+                                    }
+                                    @if (canDelete)
+                                    {
+                                        <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => DeleteFolder(folder.Id)" @onclick:stopPropagation="true" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                    }
                                 </div>
                             }
                         </div>
@@ -151,15 +177,24 @@
                                         </td>
                                         <td class="text-end pe-3" @onclick:stopPropagation="true">
                                             <div class="btn-group shadow-sm border rounded bg-white">
-                                                <a href="/api/documents/@(doc.Id)/view" target="_blank" class="btn btn-white btn-sm px-2.5" title="Ver Seguro (Pantalla)">
-                                                    <i class="bi bi-eye-fill text-primary"></i>
-                                                </a>
-                                                <a href="/api/documents/@(doc.Id)/print" target="_blank" class="btn btn-white btn-sm px-2.5" title="Imprimir/Exportar Copia">
-                                                    <i class="bi bi-printer-fill text-secondary"></i>
-                                                </a>
-                                                <button class="btn btn-white btn-sm px-2.5 text-danger" @onclick="() => ConfirmDeleteDocument(doc)" title="Eliminar">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
+                                                @if (canRead)
+                                                {
+                                                    <a href="/api/documents/@(doc.Id)/view" target="_blank" class="btn btn-white btn-sm px-2.5" title="Ver Seguro (Pantalla)">
+                                                        <i class="bi bi-eye-fill text-primary"></i>
+                                                    </a>
+                                                }
+                                                @if (canPrint)
+                                                {
+                                                    <a href="/api/documents/@(doc.Id)/print" target="_blank" class="btn btn-white btn-sm px-2.5" title="Imprimir/Exportar Copia">
+                                                        <i class="bi bi-printer-fill text-secondary"></i>
+                                                    </a>
+                                                }
+                                                @if (canDelete)
+                                                {
+                                                    <button class="btn btn-white btn-sm px-2.5 text-danger" @onclick="() => ConfirmDeleteDocument(doc)" title="Eliminar">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                }
                                             </div>
                                         </td>
                                     </tr>
@@ -188,18 +223,21 @@
                     </div>
                 </div>
                 <div class="d-flex gap-2">
-                    @if (selectedDocument.Status == DocumentStatus.DRAFT || selectedDocument.Status == DocumentStatus.REVIEW)
+                    @if (canEdit && (selectedDocument.Status == DocumentStatus.DRAFT || selectedDocument.Status == DocumentStatus.REVIEW))
                     {
                         <button class="btn btn-success btn-sm fw-bold px-3 py-2" @onclick="() => OpenApproveModal()">
                             <i class="bi bi-check-circle me-1"></i> Aprobar Documento
                         </button>
                     }
-                    <button class="btn btn-outline-primary btn-sm fw-bold px-3 py-2" @onclick="() => OpenAddVersionModal()">
-                        <i class="bi bi-cloud-upload me-1"></i> Nueva Versión
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm fw-bold px-3 py-2" @onclick="() => OpenEditMetadataModal()">
-                        <i class="bi bi-pencil me-1"></i> Editar Metadatos
-                    </button>
+                    @if (canEdit)
+                    {
+                        <button class="btn btn-outline-primary btn-sm fw-bold px-3 py-2" @onclick="() => OpenAddVersionModal()">
+                            <i class="bi bi-cloud-upload me-1"></i> Nueva Versión
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm fw-bold px-3 py-2" @onclick="() => OpenEditMetadataModal()">
+                            <i class="bi bi-pencil me-1"></i> Editar Metadatos
+                        </button>
+                    }
                     <button class="btn btn-light btn-sm rounded-circle" @onclick="() => selectedDocument = null"><i class="bi bi-x-lg"></i></button>
                 </div>
             </div>
@@ -602,6 +640,7 @@
         </div>
     </div>
 }
+}
 
 <style>
     .folders-list {
@@ -667,6 +706,11 @@
 
 @code {
     private bool isAdmin = false;
+    private bool canRead = false;
+    private bool canCreate = false;
+    private bool canEdit = false;
+    private bool canDelete = false;
+    private bool canPrint = false;
     private List<FolderDto> folders = new();
     private List<DocumentType> documentTypes = new();
     private List<DocumentDto> allDocuments = new();
@@ -764,6 +808,13 @@
                 currentUserId = uId;
             }
             isAdmin = user.IsInRole("Administrador");
+
+            var userPermissions = await PermissionService.GetPermissionsForUserAsync(user, "Documents");
+            canRead = userPermissions.CanRead;
+            canCreate = userPermissions.CanCreate;
+            canEdit = userPermissions.CanEdit;
+            canDelete = userPermissions.CanDelete;
+            canPrint = userPermissions.CanPrint;
         }
 
         await LoadFoldersAsync();
@@ -877,6 +928,16 @@
 
     private async Task SaveFolder()
     {
+        if (editingFolderId.HasValue && !canEdit)
+        {
+            folderError = "No tiene permisos para renombrar carpetas.";
+            return;
+        }
+        if (!editingFolderId.HasValue && !canCreate)
+        {
+            folderError = "No tiene permisos para crear carpetas.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(folderModalName))
         {
             folderError = "El nombre de la carpeta es requerido.";
@@ -913,9 +974,9 @@
 
     private async Task DeleteFolder(Guid id)
     {
-        if (!isAdmin)
+        if (!canDelete)
         {
-            await JS.InvokeVoidAsync("alert", "Error: No tiene permisos de administrador para eliminar carpetas.");
+            await JS.InvokeVoidAsync("alert", "Error: No tiene permisos para eliminar carpetas.");
             return;
         }
 
@@ -959,6 +1020,11 @@
 
     private async Task SaveDocument()
     {
+        if (!canCreate)
+        {
+            addDocError = "No tiene permisos para registrar documentos.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(newDocCode) || string.IsNullOrWhiteSpace(newDocTitle))
         {
             addDocError = "El código y el título son obligatorios.";
@@ -1058,6 +1124,11 @@
     private async Task SaveMetadataChanges()
     {
         if (editingDoc == null) return;
+        if (!canEdit)
+        {
+            editMetadataError = "No tiene permisos para modificar metadatos.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(editingDoc.DocCode) || string.IsNullOrWhiteSpace(editingDoc.Title))
         {
             editMetadataError = "El código y el título son obligatorios.";
@@ -1099,6 +1170,11 @@
 
     private async Task ConfirmDeleteDocument(DocumentDto doc)
     {
+        if (!canDelete)
+        {
+            await JS.InvokeVoidAsync("alert", "Error: No tiene permisos para eliminar documentos.");
+            return;
+        }
         var confirm = await JS.InvokeAsync<bool>("confirm", $"¿Está seguro de que desea eliminar el documento '{doc.Title}' ({doc.DocCode})?");
         if (confirm)
         {
@@ -1136,6 +1212,11 @@
     private async Task SaveNewVersion()
     {
         if (selectedDocument == null) return;
+        if (!canEdit)
+        {
+            addVersionError = "No tiene permisos para subir una nueva versión.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(newVersionLabel) || string.IsNullOrWhiteSpace(newVersionChangeSummary))
         {
             addVersionError = "La etiqueta de versión y el resumen del cambio son obligatorios.";
@@ -1199,6 +1280,11 @@
     private async Task ApproveDocument()
     {
         if (selectedDocument == null) return;
+        if (!canEdit)
+        {
+            approveError = "No tiene permisos para aprobar documentos.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(approveComments))
         {
             approveError = "Debe ingresar comentarios de aprobación para auditar la firma.";

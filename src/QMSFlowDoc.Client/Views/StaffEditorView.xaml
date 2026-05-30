@@ -43,10 +43,10 @@
                             <DatePicker x:Name="HiredDatePicker" Header="Fecha de Contratación" Grid.Row="1" Grid.Column="0" />
                             <ComboBox x:Name="RoleCombo" Header="Permisos" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch">
                                 <ComboBoxItem Content="Administrador" Tag="Administrador" />
-                                <ComboBoxItem Content="Manager" Tag="Manager" />
-                                <ComboBoxItem Content="Quality" Tag="Quality" />
-                                <ComboBoxItem Content="Consultor" Tag="Consultor" />
-                                <ComboBoxItem Content="Staff" Tag="Staff" />
+                                <ComboBoxItem Content="Responsable calidad" Tag="Responsable calidad" />
+                                <ComboBoxItem Content="Facultativo" Tag="Facultativo" />
+                                <ComboBoxItem Content="Auditor" Tag="Auditor" />
+                                <ComboBoxItem Content="Técnico" Tag="Técnico" />
                             </ComboBox>
                             <CheckBox x:Name="IsActiveCheck" Content="Ficha Activa" IsChecked="True" Grid.Row="2" Grid.Column="0" />
                         </Grid>

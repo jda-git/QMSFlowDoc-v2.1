@@ -3,13 +3,27 @@
 @using QMSFlowDoc.Application.Services.Staff
 @using QMSFlowDoc.Shared.DTOs
 @using Microsoft.AspNetCore.Authorization
+@using QMSFlowDoc.Application.Services.Identity
 @attribute [Authorize]
 @inject IStaffService StaffService
 @inject IJSRuntime JS
+@inject IPermissionService PermissionService
 
 <PageTitle>Personal y Formación (ISO 15189) - QMSFlowDoc</PageTitle>
 
-<div class="staff-container py-4">
+@if (!canRead)
+{
+    <div class="staff-container py-4">
+        <div class="alert alert-danger p-4 rounded-4 shadow-sm border border-danger border-opacity-25 mt-4 text-center">
+            <i class="bi bi-shield-slash-fill fs-1 text-danger d-block mb-3"></i>
+            <h4 class="fw-bold">Acceso No Autorizado</h4>
+            <p class="text-muted mb-0">Su rol de usuario no tiene permisos de lectura para acceder a Personal y Formación.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="staff-container py-4">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -17,9 +31,12 @@
             <p class="text-muted mb-0">Gestión de expedientes, capacitación técnica, evaluación de competencias y autorizaciones clínicas.</p>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-premium px-4" @onclick="OpenAddStaffModal">
-                <i class="bi bi-person-plus-fill me-2"></i> Registrar Empleado
-            </button>
+            @if (canCreate)
+            {
+                <button class="btn btn-premium px-4" @onclick="OpenAddStaffModal">
+                    <i class="bi bi-person-plus-fill me-2"></i> Registrar Empleado
+                </button>
+            }
         </div>
     </div>
 
@@ -185,12 +202,18 @@
                                         </span>
                                     </td>
                                     <td class="text-end pe-3" @onclick:stopPropagation="true">
-                                        <button class="btn btn-outline-secondary btn-sm rounded-3 px-3 me-1" @onclick="() => SelectStaff(staff.Id)">
-                                            <i class="bi bi-eye"></i> Expediente
-                                        </button>
-                                        <button class="btn btn-light btn-sm rounded-3 border px-2.5" @onclick="() => EditStaffProfile(staff)">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </button>
+                                        @if (canRead)
+                                        {
+                                            <button class="btn btn-outline-secondary btn-sm rounded-3 px-3 me-1" @onclick="() => SelectStaff(staff.Id)">
+                                                <i class="bi bi-eye"></i> Expediente
+                                            </button>
+                                        }
+                                        @if (canEdit)
+                                        {
+                                            <button class="btn btn-light btn-sm rounded-3 border px-2.5" @onclick="() => EditStaffProfile(staff)">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -203,9 +226,12 @@
         {
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted small">@trainingActivities.Count actividades de formación registradas</span>
-                <button class="btn btn-outline-primary btn-sm px-3" @onclick="OpenAddTrainingModal">
-                    <i class="bi bi-plus-circle me-1"></i> Nueva Actividad
-                </button>
+                @if (canCreate)
+                {
+                    <button class="btn btn-outline-primary btn-sm px-3" @onclick="OpenAddTrainingModal">
+                        <i class="bi bi-plus-circle me-1"></i> Nueva Actividad
+                    </button>
+                }
             </div>
 
             <!-- Training Activities Table -->
@@ -245,9 +271,12 @@
                                     </span>
                                 </td>
                                 <td class="text-end pe-3">
-                                    <button class="btn btn-sm btn-outline-primary px-3 rounded-3" @onclick="() => OpenAssignTrainingModal(act)">
-                                        <i class="bi bi-person-plus-fill me-1"></i> Asignar
-                                    </button>
+                                    @if (canEdit)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary px-3 rounded-3" @onclick="() => OpenAssignTrainingModal(act)">
+                                            <i class="bi bi-person-plus-fill me-1"></i> Asignar
+                                        </button>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -259,9 +288,12 @@
         {
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted small">@competencyCatalog.Count competencias en catálogo</span>
-                <button class="btn btn-outline-success btn-sm px-3" @onclick="OpenAddCompetencyCatalogModal">
-                    <i class="bi bi-plus-circle me-1"></i> Nueva Competencia
-                </button>
+                @if (canCreate)
+                {
+                    <button class="btn btn-outline-success btn-sm px-3" @onclick="OpenAddCompetencyCatalogModal">
+                        <i class="bi bi-plus-circle me-1"></i> Nueva Competencia
+                    </button>
+                }
             </div>
 
             <!-- Competency Catalog Table -->
@@ -295,12 +327,18 @@
                                     </span>
                                 </td>
                                 <td class="text-end pe-3">
-                                    <button class="btn btn-light btn-sm rounded-3 border px-2.5 me-1" @onclick="() => OpenEditCompetencyCatalogModal(comp)" title="Editar">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm rounded-3 px-2.5" @onclick="() => ConfirmDeleteCompetencyCatalog(comp)" title="Eliminar">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if (canEdit)
+                                    {
+                                        <button class="btn btn-light btn-sm rounded-3 border px-2.5 me-1" @onclick="() => OpenEditCompetencyCatalogModal(comp)" title="Editar">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                    }
+                                    @if (canDelete)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm rounded-3 px-2.5" @onclick="() => ConfirmDeleteCompetencyCatalog(comp)" title="Eliminar">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -312,9 +350,12 @@
         {
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted small">@authorizationsCatalog.Count autorizaciones clínicas definidas</span>
-                <button class="btn btn-outline-warning btn-sm text-dark px-3 fw-medium" @onclick="OpenAddAuthorizationCatalogModal">
-                    <i class="bi bi-plus-circle me-1"></i> Nueva Autorización
-                </button>
+                @if (canCreate)
+                {
+                    <button class="btn btn-outline-warning btn-sm text-dark px-3 fw-medium" @onclick="OpenAddAuthorizationCatalogModal">
+                        <i class="bi bi-plus-circle me-1"></i> Nueva Autorización
+                    </button>
+                }
             </div>
 
             <!-- Authorizations Catalog Table -->
@@ -362,12 +403,18 @@
                                     </div>
                                 </td>
                                 <td class="text-end pe-3">
-                                    <button class="btn btn-light btn-sm rounded-3 border px-2.5 me-1" @onclick="() => OpenEditAuthorizationCatalogModal(auth)" title="Editar">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm rounded-3 px-2.5" @onclick="() => ConfirmDeleteAuthorizationCatalog(auth)" title="Eliminar">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if (canEdit)
+                                    {
+                                        <button class="btn btn-light btn-sm rounded-3 border px-2.5 me-1" @onclick="() => OpenEditAuthorizationCatalogModal(auth)" title="Editar">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                    }
+                                    @if (canDelete)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm rounded-3 px-2.5" @onclick="() => ConfirmDeleteAuthorizationCatalog(auth)" title="Eliminar">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -447,9 +494,12 @@
             {
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">Evaluaciones de Competencia</h5>
-                    <button class="btn btn-primary btn-sm px-3" @onclick="OpenAddEvaluationModal">
-                        <i class="bi bi-shield-plus me-1"></i> Evaluar
-                    </button>
+                    @if (canEdit)
+                    {
+                        <button class="btn btn-primary btn-sm px-3" @onclick="OpenAddEvaluationModal">
+                            <i class="bi bi-shield-plus me-1"></i> Evaluar
+                        </button>
+                    }
                 </div>
                 @if (!selectedStaffDetail.CompetencyEvaluations.Any())
                 {
@@ -480,9 +530,12 @@
             {
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">Firmas y Procesos Autorizados</h5>
-                    <button class="btn btn-warning btn-sm text-dark px-3 fw-medium" @onclick="OpenAddAuthorizationModal">
-                        <i class="bi bi-key me-1"></i> Autorizar
-                    </button>
+                    @if (canEdit)
+                    {
+                        <button class="btn btn-warning btn-sm text-dark px-3 fw-medium" @onclick="OpenAddAuthorizationModal">
+                            <i class="bi bi-key me-1"></i> Autorizar
+                        </button>
+                    }
                 </div>
                 @if (!selectedStaffDetail.Authorizations.Any())
                 {
@@ -1008,6 +1061,7 @@
         </div>
     </div>
 }
+}
 
 <style>
     .drawer-overlay {
@@ -1128,6 +1182,12 @@
     private AuthorizationCatalogDto? deletingAuthorizationCatalog;
     private string? catalogErrorMessage;
 
+    private bool canRead = false;
+    private bool canCreate = false;
+    private bool canEdit = false;
+    private bool canDelete = false;
+    private bool canPrint = false;
+
     // Form Models
     private StaffModel staffModel = new();
     private TrainingModel trainingModel = new();
@@ -1154,6 +1214,13 @@
             {
                 currentUserId = uId;
             }
+
+            var userPermissions = await PermissionService.GetPermissionsForUserAsync(user, "Staff");
+            canRead = userPermissions.CanRead;
+            canCreate = userPermissions.CanCreate;
+            canEdit = userPermissions.CanEdit;
+            canDelete = userPermissions.CanDelete;
+            canPrint = userPermissions.CanPrint;
         }
         await LoadData();
     }
@@ -1223,6 +1290,8 @@
 
     private async Task SaveStaffProfile()
     {
+        if (isEditingStaff && !canEdit) return;
+        if (!isEditingStaff && !canCreate) return;
         Guid? uId = string.IsNullOrEmpty(staffModel.UserId) ? null : Guid.Parse(staffModel.UserId);
         var req = new CreateStaffProfileRequest(uId ?? Guid.Empty, staffModel.PositionTitle, staffModel.Department, staffModel.HiredAt);
 
@@ -1260,6 +1329,7 @@
 
     private async Task SaveTrainingActivity()
     {
+        if (!canCreate) return;
         if (trainingModel.TrainingTypeId == Guid.Empty) return;
 
         var req = new CreateTrainingActivityRequest(
@@ -1295,6 +1365,7 @@
 
     private async Task SaveAssignment()
     {
+        if (!canEdit) return;
         if (assignmentModel.StaffId == Guid.Empty) return;
 
         var req = new AssignStaffTrainingRequest(
@@ -1327,6 +1398,7 @@
 
     private async Task SaveCompetencyEvaluation()
     {
+        if (!canEdit) return;
         if (evaluationModel.CompetencyId == Guid.Empty || evaluationModel.EvaluatorStaffId == Guid.Empty) return;
 
         var comp = competencyCatalog.First(c => c.Id == evaluationModel.CompetencyId);
@@ -1365,6 +1437,7 @@
 
     private async Task SaveAuthorization()
     {
+        if (!canEdit) return;
         if (grantModel.AuthorizationId == Guid.Empty) return;
 
         var auth = authorizationsCatalog.First(a => a.Id == grantModel.AuthorizationId);
@@ -1421,6 +1494,8 @@
 
     private async Task SaveCompetencyCatalog()
     {
+        if (isEditingCompetencyCatalog && !canEdit) return;
+        if (!isEditingCompetencyCatalog && !canCreate) return;
         var req = new CreateCompetencyCatalogRequest(
             competencyCatalogModel.Code,
             competencyCatalogModel.Name,
@@ -1453,6 +1528,7 @@
 
     private async Task DeleteCompetencyCatalog()
     {
+        if (!canDelete) return;
         if (deletingCompetencyCatalog != null)
         {
             await StaffService.DeleteCompetencyCatalogAsync(deletingCompetencyCatalog.Id);
@@ -1497,6 +1573,8 @@
 
     private async Task SaveAuthorizationCatalog()
     {
+        if (isEditingAuthorizationCatalog && !canEdit) return;
+        if (!isEditingAuthorizationCatalog && !canCreate) return;
         if (string.IsNullOrEmpty(authorizationCatalogModel.AssessmentMethod))
         {
             catalogErrorMessage = "Debe seleccionar un método de valoración de habilidades.";
@@ -1545,6 +1623,7 @@
 
     private async Task DeleteAuthorizationCatalog()
     {
+        if (!canDelete) return;
         if (deletingAuthorizationCatalog != null)
         {
             await StaffService.DeleteAuthorizationCatalogAsync(deletingAuthorizationCatalog.Id);

@@ -1,0 +1,1119 @@
+@page "/quality"
+@rendermode InteractiveServer
+@using QMSFlowDoc.Application.Services.Quality
+@using QMSFlowDoc.Shared.Models
+@using QMSFlowDoc.Shared.DTOs
+@using Microsoft.AspNetCore.Authorization
+@using QMSFlowDoc.Application.Services.Identity
+@using NCStatus = QMSFlowDoc.Shared.Models.NCStatus
+@using ComplaintStatus = QMSFlowDoc.Shared.Models.ComplaintStatus
+@using NCSeverity = QMSFlowDoc.Shared.Models.NCSeverity
+@using CAPAStatus = QMSFlowDoc.Shared.Models.CAPAStatus
+@using ComplaintCategory = QMSFlowDoc.Shared.Models.ComplaintCategory
+@using ClaimantType = QMSFlowDoc.Shared.Models.ClaimantType
+@using Nonconformity = QMSFlowDoc.Shared.Models.Nonconformity
+@using Complaint = QMSFlowDoc.Shared.Models.Complaint
+@using CAPAActionType = QMSFlowDoc.Shared.Models.CAPAActionType
+@using ClinicalImpact = QMSFlowDoc.Shared.Models.ClinicalImpact
+@attribute [Authorize]
+@inject IQualityService QualityService
+@inject IJSRuntime JS
+@inject IPermissionService PermissionService
+
+
+<PageTitle>No Conformidades y Calidad — QMSFlowDoc</PageTitle>
+
+@if (!canRead)
+{
+    <div class="quality-container py-4">
+        <div class="alert alert-danger p-4 rounded-4 shadow-sm border border-danger border-opacity-25 mt-4 text-center">
+            <i class="bi bi-shield-slash-fill fs-1 text-danger d-block mb-3"></i>
+            <h4 class="fw-bold">Acceso No Autorizado</h4>
+            <p class="text-muted mb-0">Su rol de usuario no tiene permisos de lectura para acceder a No Conformidades.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="quality-container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold text-dark mb-1"><i class="bi bi-shield-exclamation text-danger me-2"></i>No Conformidades y Calidad</h1>
+            <p class="text-muted mb-0">Gestión de no conformidades, acciones CAPA y quejas/reclamaciones (ISO 15189 §8.7)</p>
+        </div>
+        <div class="d-flex gap-2">
+            @if (canCreate)
+            {
+                <button class="btn btn-premium px-4" @onclick="OpenCreateNCModal">
+                    <i class="bi bi-plus-circle-fill me-2"></i> Registrar NC
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-danger">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small d-block">NC Abiertas</span>
+                        <h3 class="fw-bold mb-0 text-danger">@ncList.Count(nc => nc.Status == NCStatus.OPEN || nc.Status == NCStatus.INVESTIGATING || nc.Status == NCStatus.ACTION)</h3>
+                    </div>
+                    <div class="stat-icon-quality bg-danger-soft rounded-3 p-2"><i class="bi bi-exclamation-triangle-fill text-danger h4 mb-0"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small d-block">NC Cerradas</span>
+                        <h3 class="fw-bold mb-0 text-success">@ncList.Count(nc => nc.Status == NCStatus.CLOSED)</h3>
+                    </div>
+                    <div class="stat-icon-quality bg-success-soft rounded-3 p-2"><i class="bi bi-check-circle-fill text-success h4 mb-0"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-warning">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small d-block">Impacto Paciente</span>
+                        <h3 class="fw-bold mb-0 text-warning">@ncList.Count(nc => nc.ImpactPatient)</h3>
+                    </div>
+                    <div class="stat-icon-quality bg-warning-soft rounded-3 p-2"><i class="bi bi-person-exclamation text-warning h4 mb-0"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-info">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small d-block">Quejas Activas</span>
+                        <h3 class="fw-bold mb-0 text-info">@complaintList.Count(c => c.Status != ComplaintStatus.CLOSED)</h3>
+                    </div>
+                    <div class="stat-icon-quality bg-info-soft rounded-3 p-2"><i class="bi bi-chat-left-text-fill text-info h4 mb-0"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-pills mb-4 gap-2">
+        <li class="nav-item">
+            <button class="nav-link rounded-pill px-4 @(activeTab == "nc" ? "active bg-dark text-white" : "bg-light text-dark border")" @onclick='() => SetTab("nc")'>
+                <i class="bi bi-exclamation-octagon me-1"></i> No Conformidades <span class="badge bg-danger ms-1 rounded-pill">@ncList.Count</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill px-4 @(activeTab == "complaints" ? "active bg-dark text-white" : "bg-light text-dark border")" @onclick='() => SetTab("complaints")'>
+                <i class="bi bi-chat-left-dots me-1"></i> Quejas y Reclamaciones <span class="badge bg-info ms-1 rounded-pill">@complaintList.Count</span>
+            </button>
+        </li>
+    </ul>
+
+    <!-- NC Tab -->
+    @if (activeTab == "nc")
+    {
+        <!-- Search & Filters -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-body p-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-5">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Buscar por título, origen..." @bind="ncSearchTerm" @bind:event="oninput" />
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" @bind="ncStatusFilter">
+                            <option value="">Todos los estados</option>
+                            <option value="OPEN">Abierta</option>
+                            <option value="INVESTIGATING">Investigando</option>
+                            <option value="ACTION">En Acción</option>
+                            <option value="CLOSED">Cerrada</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @bind="ncSeverityFilter">
+                            <option value="">Toda severidad</option>
+                            <option value="CRITICAL">Crítica</option>
+                            <option value="HIGH">Alta</option>
+                            <option value="MEDIUM">Media</option>
+                            <option value="LOW">Baja</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 text-end">
+                        <span class="text-muted small">@FilteredNC.Count() resultados</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NC Grid -->
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Título</th>
+                            <th>Severidad</th>
+                            <th>Estado</th>
+                            <th>Origen</th>
+                            <th>Paciente</th>
+                            <th>Acciones</th>
+                            <th>Fecha</th>
+                            <th class="text-end pe-4">Opciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!FilteredNC.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 text-muted opacity-50"></i>
+                                    No se encontraron no conformidades.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var nc in FilteredNC)
+                        {
+                            <tr class="cursor-pointer" @onclick="() => SelectNC(nc.Id)">
+                                <td class="ps-4">
+                                    <div class="fw-semibold text-dark">@nc.Title</div>
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill @GetSeverityBadgeClass(nc.Severity)">
+                                        @GetSeverityLabel(nc.Severity)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill @GetStatusBadgeClass(nc.Status)">
+                                        @GetStatusLabel(nc.Status)
+                                    </span>
+                                </td>
+                                <td class="text-muted small">@(nc.Origin ?? "—")</td>
+                                <td>
+                                    @if (nc.ImpactPatient)
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger rounded-pill"><i class="bi bi-exclamation-diamond-fill me-1"></i>Sí</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">No</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-secondary rounded-pill">
+                                        <i class="bi bi-clipboard-check me-1"></i>@nc.ActionCount
+                                    </span>
+                                </td>
+                                <td class="text-muted small">@nc.DetectedAt.ToString("dd/MM/yyyy")</td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-3 px-3 me-1" @onclick="() => SelectNC(nc.Id)" @onclick:stopPropagation="true">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    @if (canEdit)
+                                    {
+                                        <button class="btn btn-light btn-sm rounded-3 border px-2" @onclick="() => OpenEditNCModal(nc)" @onclick:stopPropagation="true">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    }
+                                    @if (canDelete)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm rounded-3 px-2 ms-1" @onclick="() => ConfirmDeleteNC(nc)" @onclick:stopPropagation="true">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Complaints Tab -->
+    @if (activeTab == "complaints")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="input-group" style="max-width: 400px;">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" placeholder="Buscar quejas..." @bind="complaintSearchTerm" @bind:event="oninput" />
+            </div>
+            @if (canCreate)
+            {
+                <button class="btn btn-premium px-4" @onclick="OpenCreateComplaintModal">
+                    <i class="bi bi-plus-circle-fill me-2"></i> Registrar Queja
+                </button>
+            }
+        </div>
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Fuente</th>
+                            <th>Categoría</th>
+                            <th>Estado</th>
+                            <th>Descripción</th>
+                            <th>Fecha</th>
+                            <th class="text-end pe-4">Opciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!FilteredComplaints.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 text-muted opacity-50"></i>
+                                    No se encontraron quejas ni reclamaciones.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var c in FilteredComplaints)
+                        {
+                            <tr class="cursor-pointer" @onclick="() => SelectComplaint(c.Id)">
+                                <td class="ps-4 fw-semibold">@c.Source</td>
+                                <td><span class="badge rounded-pill bg-info-subtle text-info">@GetComplaintCategoryLabel(c.Category)</span></td>
+                                <td><span class="badge rounded-pill @GetComplaintStatusBadge(c.Status)">@GetComplaintStatusLabel(c.Status)</span></td>
+                                <td class="text-muted small text-truncate" style="max-width: 300px;">@c.Description</td>
+                                <td class="text-muted small">@c.Date.ToString("dd/MM/yyyy")</td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-3 px-3 me-1" @onclick="() => SelectComplaint(c.Id)" @onclick:stopPropagation="true">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    @if (canEdit)
+                                    {
+                                        <button class="btn btn-light btn-sm rounded-3 border px-2 me-1" @onclick="() => OpenEditComplaintModal(c)" @onclick:stopPropagation="true">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    }
+                                    @if (canDelete)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm rounded-3 px-2 ms-1" @onclick="() => ConfirmDeleteComplaint(c)" @onclick:stopPropagation="true">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    </div>
+}
+
+<!-- ============ NC Detail Drawer ============ -->
+@if (selectedNC != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);" @onclick="CloseNCDetail">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-gradient-dark text-white rounded-top-4 py-3 px-4" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0"><i class="bi bi-exclamation-octagon me-2"></i>@selectedNC.Title</h5>
+                        <small class="opacity-75">Detectada el @selectedNC.DetectedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseNCDetail"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Status & Severity Badges -->
+                    <div class="d-flex gap-2 mb-4">
+                        <span class="badge rounded-pill px-3 py-2 @GetSeverityBadgeClass(selectedNC.Severity) fs-7">
+                            <i class="bi bi-speedometer2 me-1"></i>@GetSeverityLabel(selectedNC.Severity)
+                        </span>
+                        <span class="badge rounded-pill px-3 py-2 @GetStatusBadgeClass(selectedNC.Status) fs-7">
+                            <i class="bi bi-flag me-1"></i>@GetStatusLabel(selectedNC.Status)
+                        </span>
+                        @if (selectedNC.Status == NCStatus.CLOSED)
+                        {
+                            <span class="badge rounded-pill px-3 py-2 bg-success text-white fs-7">
+                                <i class="bi bi-person-check-fill me-1"></i>Cerrada por: @(selectedNC.ClosedByUserName ?? "Sistema") @(selectedNC.ClosedAt.HasValue ? $"el {selectedNC.ClosedAt.Value.ToString("dd/MM/yyyy HH:mm")}" : "")
+                            </span>
+                        }
+                        @if (selectedNC.ImpactPatient)
+                        {
+                            <span class="badge rounded-pill px-3 py-2 bg-danger text-white fs-7">
+                                <i class="bi bi-heart-pulse me-1"></i>Impacto Paciente
+                            </span>
+                        }
+                    </div>
+
+                    <!-- Description Section -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-card-text me-2"></i>Descripción</h6>
+                        <p class="bg-light rounded-3 p-3 mb-0">@selectedNC.Description</p>
+                    </div>
+
+                    <!-- Details Grid -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted d-block mb-1">Origen</small>
+                                <span class="fw-semibold">@(selectedNC.Origin ?? "No especificado")</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted d-block mb-1">Contención Inmediata</small>
+                                <span class="fw-semibold">@(selectedNC.Containment ?? "No especificada")</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(selectedNC.RootCauseAnalysis))
+                    {
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-diagram-3 me-2"></i>Análisis de Causa Raíz</h6>
+                            <p class="bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3 p-3 mb-0">@selectedNC.RootCauseAnalysis</p>
+                        </div>
+                    }
+
+                    <!-- Status Change -->
+                    @if (canEdit && selectedNC.Status != NCStatus.CLOSED)
+                    {
+                        <div class="mb-4 p-3 border rounded-3 bg-light">
+                            <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-arrow-right-circle me-2"></i>Cambiar Estado</h6>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if (selectedNC.Status == NCStatus.OPEN)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" @onclick="() => ChangeNCStatus(NCStatus.INVESTIGATING)">
+                                        <i class="bi bi-search me-1"></i>Investigar
+                                    </button>
+                                }
+                                @if (selectedNC.Status == NCStatus.OPEN || selectedNC.Status == NCStatus.INVESTIGATING)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning rounded-pill px-3" @onclick="() => ChangeNCStatus(NCStatus.ACTION)">
+                                        <i class="bi bi-gear me-1"></i>En Acción
+                                    </button>
+                                }
+                                <button class="btn btn-sm btn-outline-success rounded-pill px-3" @onclick="() => ChangeNCStatus(NCStatus.CLOSED)">
+                                    <i class="bi bi-check-lg me-1"></i>Cerrar NC
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- CAPA Actions Section -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-secondary mb-0"><i class="bi bi-clipboard-check me-2"></i>Acciones CAPA (@selectedNC.Actions.Count)</h6>
+                            @if (canCreate)
+                            {
+                                <button class="btn btn-sm btn-outline-primary rounded-pill px-3" @onclick="OpenCreateCAPAModal">
+                                    <i class="bi bi-plus-lg me-1"></i>Nueva CAPA
+                                </button>
+                            }
+                        </div>
+
+                        @if (!selectedNC.Actions.Any())
+                        {
+                            <div class="text-center py-3 text-muted bg-light rounded-3">
+                                <i class="bi bi-clipboard2 d-block mb-1 fs-4 opacity-50"></i>
+                                <small>No hay acciones CAPA registradas.</small>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var capa in selectedNC.Actions.OrderBy(a => a.Status).ThenBy(a => a.DueDate))
+                            {
+                                <div class="border rounded-3 p-3 mb-2 bg-white shadow-sm">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <span class="badge rounded-pill me-2 @(capa.ActionType == CAPAActionType.CORRECTIVE ? "bg-primary" : "bg-info text-dark")">
+                                                @(capa.ActionType == CAPAActionType.CORRECTIVE ? "Correctiva" : "Preventiva")
+                                            </span>
+                                            <span class="badge rounded-pill @GetCAPAStatusBadge(capa.Status)">@GetCAPAStatusLabel(capa.Status)</span>
+                                        </div>
+                                        <div class="d-flex gap-1">
+                                            @if (canEdit && capa.Status == CAPAStatus.OPEN)
+                                            {
+                                                <button class="btn btn-sm btn-outline-success rounded-pill px-2" title="Completar" @onclick="() => CompleteCAPAAction(capa.Id)">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            }
+                                            @if (canDelete)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Eliminar" @onclick="() => DeleteCAPAAction(capa.Id)">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                    <p class="mb-1 mt-2 small">@capa.Description</p>
+                                    <div class="d-flex gap-3 text-muted small">
+                                        @if (capa.DueDate.HasValue)
+                                        {
+                                            <span><i class="bi bi-calendar3 me-1"></i>Vence: @capa.DueDate.Value.ToString("dd/MM/yyyy")</span>
+                                        }
+                                        @if (capa.CompletedAt.HasValue)
+                                        {
+                                            <span class="text-success"><i class="bi bi-check2-circle me-1"></i>Completada: @capa.CompletedAt.Value.ToString("dd/MM/yyyy") por @(capa.ClosedByUserName ?? "Sistema")</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(capa.EffectivenessCheck))
+                                    {
+                                        <div class="mt-2 p-2 bg-success bg-opacity-10 rounded-2 small text-success">
+                                            <i class="bi bi-patch-check me-1"></i>Eficacia: @capa.EffectivenessCheck
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ============ Complaint Detail Drawer ============ -->
+@if (selectedComplaint != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);" @onclick="CloseComplaintDetail">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-gradient-dark text-white rounded-top-4 py-3 px-4" style="background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%);">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0"><i class="bi bi-chat-left-text me-2"></i>Queja / Reclamación</h5>
+                        <small class="opacity-75">Registrada el @selectedComplaint.Date.ToString("dd/MM/yyyy")</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseComplaintDetail"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="d-flex gap-2 mb-4">
+                        <span class="badge rounded-pill px-3 py-2 bg-info-subtle text-info fs-7">@GetComplaintCategoryLabel(selectedComplaint.Category)</span>
+                        <span class="badge rounded-pill px-3 py-2 @GetComplaintStatusBadge(selectedComplaint.Status) fs-7">@GetComplaintStatusLabel(selectedComplaint.Status)</span>
+                        @if (selectedComplaint.Status == ComplaintStatus.CLOSED)
+                        {
+                            <span class="badge rounded-pill px-3 py-2 bg-success text-white fs-7">
+                                <i class="bi bi-person-check-fill me-1"></i>Cerrada por: @(selectedComplaint.ClosedByUserName ?? "Sistema") @(selectedComplaint.ClosedAt.HasValue ? $"el {selectedComplaint.ClosedAt.Value.ToString("dd/MM/yyyy HH:mm")}" : "")
+                            </span>
+                        }
+                        @if (selectedComplaint.ClinicalImpact != ClinicalImpact.NONE)
+                        {
+                            <span class="badge rounded-pill px-3 py-2 bg-danger text-white fs-7">
+                                <i class="bi bi-heart-pulse me-1"></i>Impacto Clínico: @selectedComplaint.ClinicalImpact
+                            </span>
+                        }
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted d-block mb-1">Fuente / Reclamante</small>
+                                <span class="fw-semibold">@selectedComplaint.Source</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted d-block mb-1">Tipo de Reclamante</small>
+                                <span class="fw-semibold">@GetClaimantLabel(selectedComplaint.ClaimantType)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-card-text me-2"></i>Descripción</h6>
+                        <p class="bg-light rounded-3 p-3 mb-0">@selectedComplaint.Description</p>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(selectedComplaint.InvestigationResult))
+                    {
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-search me-2"></i>Resultado Investigación</h6>
+                            <p class="bg-info bg-opacity-10 rounded-3 p-3 mb-0">@selectedComplaint.InvestigationResult</p>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(selectedComplaint.CorrectiveAction))
+                    {
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-tools me-2"></i>Acción Correctiva</h6>
+                            <p class="bg-success bg-opacity-10 rounded-3 p-3 mb-0">@selectedComplaint.CorrectiveAction</p>
+                        </div>
+                    }
+
+                    <!-- Status Change for Complaint -->
+                    @if (canEdit && selectedComplaint.Status != ComplaintStatus.CLOSED)
+                    {
+                        <div class="p-3 border rounded-3 bg-light">
+                            <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-arrow-right-circle me-2"></i>Acciones y Cambiar Estado</h6>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if (selectedComplaint.Status == ComplaintStatus.OPEN)
+                                {
+                                    <button class="btn btn-sm btn-outline-info rounded-pill px-3" @onclick="() => ChangeComplaintStatus(ComplaintStatus.VALIDATED)">Validar</button>
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" @onclick="() => ChangeComplaintStatus(ComplaintStatus.INVESTIGATING)">Investigar</button>
+                                }
+                                @if (selectedComplaint.Status == ComplaintStatus.VALIDATED || selectedComplaint.Status == ComplaintStatus.INVESTIGATING)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning rounded-pill px-3" @onclick="() => ChangeComplaintStatus(ComplaintStatus.RESOLVED)">Resolver</button>
+                                }
+                                <button class="btn btn-sm btn-outline-success rounded-pill px-3" @onclick="() => ChangeComplaintStatus(ComplaintStatus.CLOSED)">
+                                    <i class="bi bi-check-lg me-1"></i>Cerrar
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" @onclick="() => EditSelectedComplaint()">
+                                    <i class="bi bi-pencil me-1"></i>Editar Queja
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ============ Create/Edit NC Modal ============ -->
+@if (showNCModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-gradient-dark text-white rounded-top-4 py-3 px-4" style="background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%);">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-exclamation-octagon me-2"></i>
+                        @(isEditingNC ? "Editar No Conformidad" : "Registrar No Conformidad")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showNCModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <EditForm Model="ncModel" OnValidSubmit="SaveNC">
+                        <DataAnnotationsValidator />
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Título <span class="text-danger">*</span></label>
+                                <InputText class="form-control form-control-premium" @bind-Value="ncModel.Title" placeholder="Descripción breve de la no conformidad..." />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Descripción Detallada <span class="text-danger">*</span></label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="ncModel.Description" rows="3" placeholder="Descripción completa del hallazgo..." />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Severidad</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="ncModel.Severity">
+                                    <option value="LOW">Baja</option>
+                                    <option value="MEDIUM">Media</option>
+                                    <option value="HIGH">Alta</option>
+                                    <option value="CRITICAL">Crítica</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Origen</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="ncModel.Origin">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Equipamiento">Equipamiento</option>
+                                    <option value="Reactivo">Reactivo</option>
+                                    <option value="Proceso">Proceso</option>
+                                    <option value="Documento">Documento</option>
+                                    <option value="Personal">Personal</option>
+                                    <option value="Externo">Externo</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check form-switch">
+                                    <InputCheckbox class="form-check-input" @bind-Value="ncModel.ImpactPatient" />
+                                    <label class="form-check-label fw-semibold">¿Impacto en Paciente?</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Contención Inmediata</label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="ncModel.Containment" rows="2" placeholder="Acciones inmediatas para contener el problema..." />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Análisis de Causa Raíz</label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="ncModel.RootCauseAnalysis" rows="2" placeholder="Investigación sobre la causa raíz (5 porqués, Ishikawa, etc.)..." />
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(ncErrorMessage))
+                        {
+                            <div class="alert alert-danger mt-3 rounded-3">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>@ncErrorMessage
+                            </div>
+                        }
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showNCModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-danger px-4 text-white">
+                                <i class="bi bi-check-lg me-1"></i>@(isEditingNC ? "Guardar Cambios" : "Registrar NC")
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ============ Create CAPA Modal ============ -->
+@if (showCAPAModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-gradient-dark text-white rounded-top-4 py-3 px-4" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-clipboard-plus me-2"></i>Nueva Acción CAPA</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showCAPAModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <EditForm Model="capaModel" OnValidSubmit="SaveCAPA">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Tipo de Acción</label>
+                            <InputSelect class="form-select form-select-premium" @bind-Value="capaModel.ActionType">
+                                <option value="CORRECTIVE">Correctiva</option>
+                                <option value="PREVENTIVE">Preventiva</option>
+                            </InputSelect>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Descripción <span class="text-danger">*</span></label>
+                            <InputTextArea class="form-control form-control-premium" @bind-Value="capaModel.Description" rows="3" placeholder="Descripción de la acción a realizar..." />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Fecha Límite</label>
+                            <InputDate class="form-control form-control-premium" @bind-Value="capaModel.DueDate" />
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showCAPAModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-primary px-4 text-white">
+                                <i class="bi bi-check-lg me-1"></i>Registrar CAPA
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ============ Create/Edit Complaint Modal ============ -->
+@if (showComplaintModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-gradient-dark text-white rounded-top-4 py-3 px-4" style="background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%);">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-chat-left-text me-2"></i>
+                        @(isEditingComplaint ? "Editar Queja / Reclamación" : "Registrar Queja / Reclamación")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showComplaintModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <EditForm Model="complaintModel" OnValidSubmit="SaveComplaint">
+                        <DataAnnotationsValidator />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Fuente / Reclamante <span class="text-danger">*</span></label>
+                                <InputText class="form-control form-control-premium" @bind-Value="complaintModel.Source" placeholder="Nombre del reclamante..." />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Categoría</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="complaintModel.Category">
+                                    <option value="PATIENT">Paciente</option>
+                                    <option value="CLINICAL">Clínica</option>
+                                    <option value="TURNAROUND">Tiempo de respuesta</option>
+                                    <option value="REPORT_ERROR">Error de informe</option>
+                                    <option value="OTHER">Otra</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Descripción <span class="text-danger">*</span></label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="complaintModel.Description" rows="3" placeholder="Descripción detallada de la queja o reclamación..." />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Resultado de Investigación</label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="complaintModel.InvestigationResult" rows="2" placeholder="Hallazgos de la investigación..." />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Acción Correctiva</label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="complaintModel.CorrectiveAction" rows="2" placeholder="Acciones correctivas aplicadas..." />
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showComplaintModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-info px-4 text-white">
+                                <i class="bi bi-check-lg me-1"></i>@(isEditingComplaint ? "Guardar Cambios" : "Registrar Queja")
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ============ Delete Confirmation ============ -->
+@if (showDeleteConfirm)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-sm" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-danger text-white rounded-top-4 py-3 px-4">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar Eliminación</h6>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <p class="mb-0">@deleteConfirmMessage</p>
+                </div>
+                <div class="modal-footer border-0 justify-content-center gap-2 pb-4">
+                    <button class="btn btn-light px-4" @onclick="() => showDeleteConfirm = false">Cancelar</button>
+                    <button class="btn btn-danger px-4" @onclick="ExecuteDelete">
+                        <i class="bi bi-trash3 me-1"></i>Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .quality-container { max-width: 1400px; margin: 0 auto; padding: 0 1.5rem; }
+    .cursor-pointer { cursor: pointer; }
+    .stat-icon-quality { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+    .bg-danger-soft { background-color: #fee2e2; }
+    .bg-success-soft { background-color: #dcfce7; }
+    .bg-warning-soft { background-color: #fef9c3; }
+    .bg-info-soft { background-color: #e0f2fe; }
+    .fs-7 { font-size: 0.85rem; }
+    .form-control-premium, .form-select-premium {
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+        padding: 0.6rem 1rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-control-premium:focus, .form-select-premium:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+</style>
+
+@code {
+    private string activeTab = "nc";
+    private string ncSearchTerm = string.Empty;
+    private string ncStatusFilter = string.Empty;
+    private string ncSeverityFilter = string.Empty;
+    private string complaintSearchTerm = string.Empty;
+
+    private List<NCListDto> ncList = new();
+    private List<ComplaintListDto> complaintList = new();
+
+    private Nonconformity? selectedNC;
+    private Complaint? selectedComplaint;
+
+    // Modals
+    private bool showNCModal = false;
+    private bool showCAPAModal = false;
+    private bool showComplaintModal = false;
+    private bool showDeleteConfirm = false;
+    private bool isEditingNC = false;
+    private Guid? editingNCId;
+    private bool isEditingComplaint = false;
+    private Guid? editingComplaintId;
+    private string? ncErrorMessage;
+    private string deleteConfirmMessage = "";
+    private Func<Task>? deleteAction;
+
+    // Permissions
+    private bool canRead = false;
+    private bool canCreate = false;
+    private bool canEdit = false;
+    private bool canDelete = false;
+    private bool canPrint = false;
+
+    // Form Models
+    private NCFormModel ncModel = new();
+    private CAPAFormModel capaModel = new();
+    private ComplaintFormModel complaintModel = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+    private Guid? currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var uId))
+                currentUserId = uId;
+
+            var perms = await PermissionService.GetPermissionsForUserAsync(user, "Quality");
+            canRead = perms.CanRead;
+            canCreate = perms.CanCreate;
+            canEdit = perms.CanEdit;
+            canDelete = perms.CanDelete;
+            canPrint = perms.CanPrint;
+        }
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        ncList = await QualityService.GetNonconformitiesAsync();
+        complaintList = await QualityService.GetComplaintsAsync();
+    }
+
+    private void SetTab(string tab) { activeTab = tab; }
+
+    // ── Filtered lists ──
+    private IEnumerable<NCListDto> FilteredNC =>
+        ncList.Where(nc =>
+            (string.IsNullOrWhiteSpace(ncSearchTerm) || nc.Title.Contains(ncSearchTerm, StringComparison.OrdinalIgnoreCase) || (nc.Origin ?? "").Contains(ncSearchTerm, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(ncStatusFilter) || nc.Status.ToString() == ncStatusFilter) &&
+            (string.IsNullOrWhiteSpace(ncSeverityFilter) || nc.Severity.ToString() == ncSeverityFilter)
+        );
+
+    private IEnumerable<ComplaintListDto> FilteredComplaints =>
+        complaintList.Where(c =>
+            string.IsNullOrWhiteSpace(complaintSearchTerm) ||
+            c.Source.Contains(complaintSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+            c.Description.Contains(complaintSearchTerm, StringComparison.OrdinalIgnoreCase)
+        );
+
+    // ── NC CRUD ──
+    private async Task SelectNC(Guid id)
+    {
+        selectedNC = await QualityService.GetNCByIdAsync(id);
+    }
+    private void CloseNCDetail() { selectedNC = null; }
+
+    private void OpenCreateNCModal()
+    {
+        isEditingNC = false;
+        editingNCId = null;
+        ncModel = new NCFormModel();
+        ncErrorMessage = null;
+        showNCModal = true;
+    }
+
+    private void OpenEditNCModal(NCListDto nc)
+    {
+        isEditingNC = true;
+        editingNCId = nc.Id;
+        ncModel = new NCFormModel
+        {
+            Title = nc.Title,
+            Description = "",
+            Severity = nc.Severity.ToString(),
+            Origin = nc.Origin ?? "",
+            ImpactPatient = nc.ImpactPatient,
+            RootCauseAnalysis = nc.RootCauseAnalysis ?? ""
+        };
+        ncErrorMessage = null;
+        showNCModal = true;
+    }
+
+    private async Task SaveNC()
+    {
+        if (string.IsNullOrWhiteSpace(ncModel.Title)) { ncErrorMessage = "El título es obligatorio."; return; }
+
+        Enum.TryParse<NCSeverity>(ncModel.Severity, out var sev);
+        var req = new CreateNCRequest(
+            ncModel.Title, ncModel.Description ?? "", sev, null,
+            ncModel.ImpactPatient, ncModel.Containment, ncModel.Origin,
+            ncModel.RootCauseAnalysis, currentUserId
+        );
+
+        if (isEditingNC && editingNCId.HasValue)
+            await QualityService.UpdateNCAsync(editingNCId.Value, req);
+        else
+            await QualityService.CreateNCAsync(req);
+
+        showNCModal = false;
+        await LoadData();
+    }
+
+    private async Task ChangeNCStatus(NCStatus status)
+    {
+        if (selectedNC == null) return;
+        await QualityService.UpdateNCStatusAsync(selectedNC.Id, status, currentUserId);
+        selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
+        await LoadData();
+    }
+
+    private void ConfirmDeleteNC(NCListDto nc)
+    {
+        deleteConfirmMessage = $"¿Está seguro de eliminar la NC '{nc.Title}'? Esta acción es irreversible.";
+        deleteAction = async () =>
+        {
+            await QualityService.DeleteNCAsync(nc.Id);
+            if (selectedNC?.Id == nc.Id) selectedNC = null;
+            await LoadData();
+        };
+        showDeleteConfirm = true;
+    }
+
+    // ── CAPA CRUD ──
+    private void OpenCreateCAPAModal()
+    {
+        capaModel = new CAPAFormModel();
+        showCAPAModal = true;
+    }
+
+    private async Task SaveCAPA()
+    {
+        if (selectedNC == null || string.IsNullOrWhiteSpace(capaModel.Description)) return;
+
+        Enum.TryParse<CAPAActionType>(capaModel.ActionType, out var at);
+        var req = new CreateCAPARequest(
+            selectedNC.Id, at, capaModel.Description,
+            currentUserId, capaModel.DueDate
+        );
+        await QualityService.CreateCAPAAsync(req);
+        showCAPAModal = false;
+        selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
+        await LoadData();
+    }
+
+    private async Task CompleteCAPAAction(Guid capaId)
+    {
+        await QualityService.CompleteCAPAAsync(capaId, null, currentUserId);
+        if (selectedNC != null) selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
+        await LoadData();
+    }
+
+    private async Task DeleteCAPAAction(Guid capaId)
+    {
+        await QualityService.DeleteCAPAAsync(capaId);
+        if (selectedNC != null) selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
+        await LoadData();
+    }
+
+    // ── Complaint CRUD ──
+    private async Task SelectComplaint(Guid id)
+    {
+        selectedComplaint = await QualityService.GetComplaintByIdAsync(id);
+    }
+    private void CloseComplaintDetail() { selectedComplaint = null; }
+
+    private void OpenCreateComplaintModal()
+    {
+        isEditingComplaint = false;
+        editingComplaintId = null;
+        complaintModel = new ComplaintFormModel();
+        showComplaintModal = true;
+    }
+
+    private async Task OpenEditComplaintModal(ComplaintListDto cDto)
+    {
+        var c = await QualityService.GetComplaintByIdAsync(cDto.Id);
+        if (c == null) return;
+        isEditingComplaint = true;
+        editingComplaintId = c.Id;
+        complaintModel = new ComplaintFormModel
+        {
+            Source = c.Source,
+            Description = c.Description,
+            Category = c.Category.ToString(),
+            InvestigationResult = c.InvestigationResult,
+            CorrectiveAction = c.CorrectiveAction
+        };
+        showComplaintModal = true;
+    }
+
+    private async Task EditSelectedComplaint()
+    {
+        if (selectedComplaint == null) return;
+        var cDto = complaintList.FirstOrDefault(x => x.Id == selectedComplaint.Id);
+        if (cDto != null)
+        {
+            await OpenEditComplaintModal(cDto);
+            CloseComplaintDetail();
+        }
+    }
+
+    private async Task SaveComplaint()
+    {
+        if (string.IsNullOrWhiteSpace(complaintModel.Source) || string.IsNullOrWhiteSpace(complaintModel.Description)) return;
+        Enum.TryParse<ComplaintCategory>(complaintModel.Category, out var cat);
+        var req = new CreateComplaintRequest(
+            complaintModel.Source, complaintModel.Description, cat,
+            complaintModel.InvestigationResult, complaintModel.CorrectiveAction
+        );
+        if (isEditingComplaint && editingComplaintId.HasValue)
+        {
+            await QualityService.UpdateComplaintAsync(editingComplaintId.Value, req);
+        }
+        else
+        {
+            await QualityService.CreateComplaintAsync(req);
+        }
+        showComplaintModal = false;
+        await LoadData();
+    }
+
+    private async Task ChangeComplaintStatus(ComplaintStatus status)
+    {
+        if (selectedComplaint == null) return;
+        await QualityService.UpdateComplaintStatusAsync(selectedComplaint.Id, status, currentUserId);
+        selectedComplaint = await QualityService.GetComplaintByIdAsync(selectedComplaint.Id);
+        await LoadData();
+    }
+
+    private void ConfirmDeleteComplaint(ComplaintListDto c)
+    {
+        deleteConfirmMessage = $"¿Está seguro de eliminar la queja de '{c.Source}'? Esta acción es irreversible.";
+        deleteAction = async () =>
+        {
+            await QualityService.DeleteComplaintAsync(c.Id);
+            if (selectedComplaint?.Id == c.Id) selectedComplaint = null;
+            await LoadData();
+        };
+        showDeleteConfirm = true;
+    }
+
+    private async Task ExecuteDelete()
+    {
+        if (deleteAction != null) await deleteAction();
+        showDeleteConfirm = false;
+        deleteAction = null;
+    }
+
+    // ── Label Helpers ──
+    private string GetSeverityLabel(NCSeverity s) => s switch { NCSeverity.LOW => "Baja", NCSeverity.MEDIUM => "Media", NCSeverity.HIGH => "Alta", NCSeverity.CRITICAL => "Crítica", _ => s.ToString() };
+    private string GetSeverityBadgeClass(NCSeverity s) => s switch { NCSeverity.LOW => "bg-secondary-subtle text-secondary", NCSeverity.MEDIUM => "bg-warning-subtle text-warning", NCSeverity.HIGH => "bg-danger-subtle text-danger", NCSeverity.CRITICAL => "bg-danger text-white", _ => "bg-light text-dark" };
+    private string GetStatusLabel(NCStatus s) => s switch { NCStatus.OPEN => "Abierta", NCStatus.INVESTIGATING => "Investigando", NCStatus.ACTION => "En Acción", NCStatus.CLOSED => "Cerrada", _ => s.ToString() };
+    private string GetStatusBadgeClass(NCStatus s) => s switch { NCStatus.OPEN => "bg-danger-subtle text-danger", NCStatus.INVESTIGATING => "bg-primary-subtle text-primary", NCStatus.ACTION => "bg-warning-subtle text-warning", NCStatus.CLOSED => "bg-success-subtle text-success", _ => "bg-light" };
+    private string GetCAPAStatusLabel(CAPAStatus s) => s switch { CAPAStatus.OPEN => "Pendiente", CAPAStatus.DONE => "Completada", CAPAStatus.VERIFIED => "Verificada", CAPAStatus.CANCELLED => "Cancelada", _ => s.ToString() };
+    private string GetCAPAStatusBadge(CAPAStatus s) => s switch { CAPAStatus.OPEN => "bg-warning-subtle text-warning", CAPAStatus.DONE => "bg-success-subtle text-success", CAPAStatus.VERIFIED => "bg-primary-subtle text-primary", CAPAStatus.CANCELLED => "bg-secondary-subtle text-secondary", _ => "bg-light" };
+    private string GetComplaintCategoryLabel(ComplaintCategory c) => c switch { ComplaintCategory.PATIENT => "Paciente", ComplaintCategory.CLINICAL => "Clínica", ComplaintCategory.TURNAROUND => "Tiempo Respuesta", ComplaintCategory.REPORT_ERROR => "Error Informe", ComplaintCategory.OTHER => "Otra", _ => c.ToString() };
+    private string GetComplaintStatusLabel(ComplaintStatus s) => s switch { ComplaintStatus.OPEN => "Abierta", ComplaintStatus.VALIDATED => "Validada", ComplaintStatus.INVESTIGATING => "Investigando", ComplaintStatus.RESOLVED => "Resuelta", ComplaintStatus.CLOSED => "Cerrada", _ => s.ToString() };
+    private string GetComplaintStatusBadge(ComplaintStatus s) => s switch { ComplaintStatus.OPEN => "bg-danger-subtle text-danger", ComplaintStatus.VALIDATED => "bg-info-subtle text-info", ComplaintStatus.INVESTIGATING => "bg-primary-subtle text-primary", ComplaintStatus.RESOLVED => "bg-warning-subtle text-warning", ComplaintStatus.CLOSED => "bg-success-subtle text-success", _ => "bg-light" };
+    private string GetClaimantLabel(ClaimantType t) => t switch { ClaimantType.PATIENT => "Paciente", ClaimantType.CLINICIAN => "Clínico", ClaimantType.STAFF => "Personal", ClaimantType.REGULATORY => "Regulatorio", ClaimantType.OTHER => "Otro", _ => t.ToString() };
+
+    // ── Form Models ──
+    public class NCFormModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string Severity { get; set; } = "LOW";
+        public string? Origin { get; set; }
+        public bool ImpactPatient { get; set; }
+        public string? Containment { get; set; }
+        public string? RootCauseAnalysis { get; set; }
+    }
+
+    public class CAPAFormModel
+    {
+        public string ActionType { get; set; } = "CORRECTIVE";
+        public string Description { get; set; } = string.Empty;
+        public DateTime? DueDate { get; set; }
+    }
+
+    public class ComplaintFormModel
+    {
+        public string Source { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Category { get; set; } = "OTHER";
+        public string? InvestigationResult { get; set; }
+        public string? CorrectiveAction { get; set; }
+    }
+}

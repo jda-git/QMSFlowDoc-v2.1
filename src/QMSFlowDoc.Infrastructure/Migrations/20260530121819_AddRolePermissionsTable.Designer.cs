@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QMSFlowDoc.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using QMSFlowDoc.Infrastructure.Persistence;
 namespace QMSFlowDoc.Infrastructure.Migrations
 {
     [DbContext(typeof(QmsDbContext))]
-    partial class QmsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260530121819_AddRolePermissionsTable")]
+    partial class AddRolePermissionsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -351,9 +354,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                     b.Property<int>("ActionType")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ClosedByUserId")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("TEXT");
 
@@ -626,9 +626,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ClosedByUserId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CorrectiveAction")
@@ -1654,12 +1651,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ClosedByUserId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Containment")

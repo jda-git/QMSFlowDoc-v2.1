@@ -4,13 +4,27 @@
 @using QMSFlowDoc.Domain.Entities
 @using QMSFlowDoc.Shared.DTOs
 @using Microsoft.AspNetCore.Authorization
+@using QMSFlowDoc.Application.Services.Identity
 @attribute [Authorize]
 @inject IInventoryService InventoryService
 @inject IJSRuntime JS
+@inject IPermissionService PermissionService
 
 <PageTitle>Control de Inventario y Reactivos - QMSFlowDoc</PageTitle>
 
-<div class="inventory-container py-4">
+@if (!canRead)
+{
+    <div class="inventory-container py-4">
+        <div class="alert alert-danger p-4 rounded-4 shadow-sm border border-danger border-opacity-25 mt-4 text-center">
+            <i class="bi bi-shield-slash-fill fs-1 text-danger d-block mb-3"></i>
+            <h4 class="fw-bold">Acceso No Autorizado</h4>
+            <p class="text-muted mb-0">Su rol de usuario no tiene permisos de lectura para acceder al Control de Inventario y Reactivos.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="inventory-container py-4">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -22,41 +36,47 @@
                 <i class="bi bi-journal-text me-2"></i> Historial de Movimientos
             </button>
 
-            <!-- Print / Download dropdown -->
-            <div class="dropdown">
-                <button class="btn btn-outline-success px-3 dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-printer me-2"></i> Imprimir / Exportar
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                    <li><h6 class="dropdown-header">Listados de Inventario</h6></li>
-                    <li>
-                        <button class="dropdown-item" @onclick='() => OpenPrintExportModal("ALL")'>
-                            <i class="bi bi-boxes me-2 text-success"></i>Listado Completo de Reactivos
-                        </button>
-                    </li>
-                    <li>
-                        <button class="dropdown-item" @onclick='() => OpenPrintExportModal("IN")'>
-                            <i class="bi bi-box-arrow-in-down me-2 text-primary"></i>Listado de Entradas
-                        </button>
-                    </li>
-                    <li>
-                        <button class="dropdown-item" @onclick='() => OpenPrintExportModal("OUT")'>
-                            <i class="bi bi-box-arrow-up me-2 text-danger"></i>Listado de Salidas
-                        </button>
-                    </li>
-                    <li><hr class="dropdown-divider" /></li>
-                    <li>
-                        <button class="dropdown-item" @onclick='() => OpenPrintExportModal("ORDER")'>
-                            <i class="bi bi-cart-plus me-2 text-warning"></i>Listado de Pedidos
-                        </button>
-                    </li>
-                </ul>
-            </div>
+            @if (canPrint)
+            {
+                <!-- Print / Download dropdown -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-success px-3 dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-printer me-2"></i> Imprimir / Exportar
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><h6 class="dropdown-header">Listados de Inventario</h6></li>
+                        <li>
+                            <button class="dropdown-item" @onclick='() => OpenPrintExportModal("ALL")'>
+                                <i class="bi bi-boxes me-2 text-success"></i>Listado Completo de Reactivos
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" @onclick='() => OpenPrintExportModal("IN")'>
+                                <i class="bi bi-box-arrow-in-down me-2 text-primary"></i>Listado de Entradas
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" @onclick='() => OpenPrintExportModal("OUT")'>
+                                <i class="bi bi-box-arrow-up me-2 text-danger"></i>Listado de Salidas
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                            <button class="dropdown-item" @onclick='() => OpenPrintExportModal("ORDER")'>
+                                <i class="bi bi-cart-plus me-2 text-warning"></i>Listado de Pedidos
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            }
 
-            <button class="btn btn-premium px-4" @onclick="OpenAddReagentModal">
-                <i class="bi bi-plus-circle me-2"></i> Nuevo Reactivo
-            </button>
+            @if (canCreate)
+            {
+                <button class="btn btn-premium px-4" @onclick="OpenAddReagentModal">
+                    <i class="bi bi-plus-circle me-2"></i> Nuevo Reactivo
+                </button>
+            }
         </div>
     </div>
 
@@ -217,18 +237,24 @@
                                 </td>
                                 <td class="text-end pe-3" @onclick:stopPropagation="true">
                                     <div class="btn-group shadow-sm border rounded bg-white">
-                                        <button class="btn btn-white btn-sm px-2.5" @onclick="() => OpenRegisterLotModal(reagent)" title="Registrar Lote">
-                                            <i class="bi bi-plus-square text-success"></i>
-                                        </button>
-                                        <button class="btn btn-white btn-sm px-2.5" @onclick="() => OpenAdjustStockModal(reagent, null)" title="Ajuste Stock">
-                                            <i class="bi bi-sliders text-secondary"></i>
-                                        </button>
-                                        <button class="btn btn-white btn-sm px-2.5 text-primary" @onclick="() => OpenEditReagentModal(reagent)" title="Editar Reactivo">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-white btn-sm px-2.5 text-danger" @onclick="() => ConfirmDeleteReagent(reagent)" title="Eliminar">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                        @if (canEdit)
+                                        {
+                                            <button class="btn btn-white btn-sm px-2.5" @onclick="() => OpenRegisterLotModal(reagent)" title="Registrar Lote">
+                                                <i class="bi bi-plus-square text-success"></i>
+                                            </button>
+                                            <button class="btn btn-white btn-sm px-2.5" @onclick="() => OpenAdjustStockModal(reagent, null)" title="Ajuste Stock">
+                                                <i class="bi bi-sliders text-secondary"></i>
+                                            </button>
+                                            <button class="btn btn-white btn-sm px-2.5 text-primary" @onclick="() => OpenEditReagentModal(reagent)" title="Editar Reactivo">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                        }
+                                        @if (canDelete)
+                                        {
+                                            <button class="btn btn-white btn-sm px-2.5 text-danger" @onclick="() => ConfirmDeleteReagent(reagent)" title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -262,12 +288,15 @@
                     </div>
                 </div>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-success btn-sm fw-bold px-3 py-2" @onclick="() => OpenRegisterLotModal(null)">
-                        <i class="bi bi-plus-square me-1"></i> Registrar Lote
-                    </button>
-                    <button class="btn btn-outline-success btn-sm fw-bold px-3 py-2" @onclick="() => OpenAdjustStockModal(null, null)">
-                        <i class="bi bi-sliders me-1"></i> Ajustar Stock
-                    </button>
+                    @if (canEdit)
+                    {
+                        <button class="btn btn-success btn-sm fw-bold px-3 py-2" @onclick="() => OpenRegisterLotModal(null)">
+                            <i class="bi bi-plus-square me-1"></i> Registrar Lote
+                        </button>
+                        <button class="btn btn-outline-success btn-sm fw-bold px-3 py-2" @onclick="() => OpenAdjustStockModal(null, null)">
+                            <i class="bi bi-sliders me-1"></i> Ajustar Stock
+                        </button>
+                    }
                     <button class="btn btn-light btn-sm rounded-circle" @onclick="() => selectedReagent = null"><i class="bi bi-x-lg"></i></button>
                 </div>
             </div>
@@ -348,6 +377,7 @@
                                             <td>
                                                 <select class="form-select form-select-sm status-dropdown-select @GetLotStatusColorClass(lot.Status)"
                                                         value="@lot.Status.ToString()" 
+                                                        disabled="@(!canEdit)"
                                                         @onchange="(e) => UpdateLotStatus(lot, e.Value?.ToString())">
                                                     <option value="RELEASED">Liberado</option>
                                                     <option value="QUARANTINE">Cuarentena</option>
@@ -361,18 +391,21 @@
                                             <td class="fw-bold">@lot.AvailableQty.ToString("N2") <small class="text-muted">/ @lot.ReceivedQty.ToString("N0")</small></td>
                                             <td class="text-end pe-3">
                                                 <div class="d-flex justify-content-end gap-1">
-                                                    @if (lot.AvailableQty > 0 && (lot.Status == LotStatus.RELEASED || lot.Status == LotStatus.IN_USE))
+                                                    @if (canEdit)
                                                     {
-                                                        <button class="btn btn-outline-success btn-xs px-2 py-0.5" @onclick="() => QuickConsumeLot(lot, 1)" title="Consumir 1 unidad">
-                                                            -1 ud
-                                                        </button>
-                                                        <button class="btn btn-outline-danger btn-xs px-2 py-0.5" @onclick="() => QuickConsumeLot(lot, lot.AvailableQty)" title="Marcar como consumido">
-                                                            Consumir Todo
+                                                        @if (lot.AvailableQty > 0 && (lot.Status == LotStatus.RELEASED || lot.Status == LotStatus.IN_USE))
+                                                        {
+                                                            <button class="btn btn-outline-success btn-xs px-2 py-0.5" @onclick="() => QuickConsumeLot(lot, 1)" title="Consumir 1 unidad">
+                                                                -1 ud
+                                                            </button>
+                                                            <button class="btn btn-outline-danger btn-xs px-2 py-0.5" @onclick="() => QuickConsumeLot(lot, lot.AvailableQty)" title="Marcar como consumido">
+                                                                Consumir Todo
+                                                            </button>
+                                                        }
+                                                        <button class="btn btn-light btn-xs p-1" @onclick="() => OpenAdjustStockModal(null, lot)" title="Ajuste Personalizado">
+                                                            <i class="bi bi-sliders"></i>
                                                         </button>
                                                     }
-                                                    <button class="btn btn-light btn-xs p-1" @onclick="() => OpenAdjustStockModal(null, lot)" title="Ajuste Personalizado">
-                                                        <i class="bi bi-sliders"></i>
-                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -798,6 +831,7 @@
         </div>
     </div>
 }
+}
 
 <style>
     .cursor-pointer {
@@ -878,6 +912,11 @@
 </style>
 
 @code {
+    private bool canRead = false;
+    private bool canCreate = false;
+    private bool canEdit = false;
+    private bool canDelete = false;
+    private bool canPrint = false;
     private bool isLoading = true;
     private string searchTerm = string.Empty;
     private string stockFilter = "all";
@@ -923,8 +962,23 @@
     private ReagentListDto? targetReagentForAdjust = null;
     private ReagentLot? targetLotForAdjust = null;
 
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            var userPermissions = await PermissionService.GetPermissionsForUserAsync(user, "Inventory");
+            canRead = userPermissions.CanRead;
+            canCreate = userPermissions.CanCreate;
+            canEdit = userPermissions.CanEdit;
+            canDelete = userPermissions.CanDelete;
+            canPrint = userPermissions.CanPrint;
+        }
+
         await LoadInventoryDataAsync();
         storageLocations = (await InventoryService.GetStorageLocationsAsync()).ToList();
         suppliers = (await InventoryService.GetSuppliersAsync()).ToList();
@@ -1029,6 +1083,7 @@
 
     private async Task UpdateLotStatus(ReagentLot lot, string? newStatusStr)
     {
+        if (!canEdit) return;
         if (Enum.TryParse<LotStatus>(newStatusStr, out var status))
         {
             var success = await InventoryService.UpdateLotStatusAsync(lot.Id, (QMSFlowDoc.Domain.Entities.LotStatus)status, null, "Usuario Web");
@@ -1045,6 +1100,7 @@
 
     private async Task QuickConsumeLot(ReagentLot lot, decimal quantity)
     {
+        if (!canEdit) return;
         var request = new AdjustStockRequest(
             lot.ReagentId,
             lot.Id,
@@ -1265,6 +1321,16 @@
     private async Task SaveReagent()
     {
         reagentError = string.Empty;
+        if (isEditingReagent && !canEdit)
+        {
+            reagentError = "No tiene permisos para modificar reactivos.";
+            return;
+        }
+        if (!isEditingReagent && !canCreate)
+        {
+            reagentError = "No tiene permisos para registrar nuevos reactivos.";
+            return;
+        }
         try
         {
             var req = new CreateReagentRequest(
@@ -1315,6 +1381,11 @@
     private async Task RegisterLot()
     {
         lotError = string.Empty;
+        if (!canEdit)
+        {
+            lotError = "No tiene permisos para registrar lotes.";
+            return;
+        }
         if (targetReagent == null) return;
         try
         {
@@ -1353,6 +1424,11 @@
     private async Task AdjustStock()
     {
         adjustError = string.Empty;
+        if (!canEdit)
+        {
+            adjustError = "No tiene permisos para ajustar stock.";
+            return;
+        }
         if (targetReagentForAdjust == null) return;
 
         var lotId = targetLotForAdjust?.Id ?? adjustModel.ReagentLotId;
@@ -1408,6 +1484,11 @@
 
     private async Task ConfirmDeleteReagent(ReagentListDto reagent)
     {
+        if (!canDelete)
+        {
+            await JS.InvokeVoidAsync("alert", "Error: No tiene permisos para eliminar reactivos.");
+            return;
+        }
         var confirmResult = await JS.InvokeAsync<object>("confirm", $"¿Está seguro de que desea eliminar el reactivo '{reagent.Name}'?");
         bool confirm = confirmResult is System.Text.Json.JsonElement j && j.GetBoolean();
         if (confirm)

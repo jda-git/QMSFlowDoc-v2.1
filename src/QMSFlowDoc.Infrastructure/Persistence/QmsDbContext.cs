@@ -79,6 +79,7 @@ namespace QMSFlowDoc.Infrastructure.Persistence
         // ── Audit & Config ──
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+        public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -101,6 +102,14 @@ namespace QMSFlowDoc.Infrastructure.Persistence
             modelBuilder.Entity<IdentityRoleClaim<Guid>>(e => e.ToTable("RoleClaims"));
             modelBuilder.Entity<IdentityUserLogin<Guid>>(e => e.ToTable("UserLogins"));
             modelBuilder.Entity<IdentityUserToken<Guid>>(e => e.ToTable("UserTokens"));
+
+            modelBuilder.Entity<RolePermission>(e =>
+            {
+                e.ToTable("RolePermissions");
+                e.HasKey(rp => rp.Id);
+                e.HasIndex(rp => new { rp.RoleId, rp.Section }).IsUnique();
+                e.Property(rp => rp.Section).HasMaxLength(100).IsRequired();
+            });
 
             // ── Documents ──
             modelBuilder.Entity<Document>(e =>

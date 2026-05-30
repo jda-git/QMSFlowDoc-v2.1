@@ -39,6 +39,9 @@ builder.Services.AddScoped<QMSFlowDoc.Application.Services.Folders.IFolderServic
 builder.Services.AddScoped<QMSFlowDoc.Application.Services.Documents.IDocumentService, QMSFlowDoc.Infrastructure.Services.Documents.DocumentService>();
 builder.Services.AddScoped<QMSFlowDoc.Application.Services.Inventory.IInventoryService, QMSFlowDoc.Infrastructure.Services.Inventory.InventoryService>();
 builder.Services.AddScoped<QMSFlowDoc.Application.Services.Staff.IStaffService, QMSFlowDoc.Infrastructure.Services.Staff.StaffService>();
+builder.Services.AddScoped<QMSFlowDoc.Application.Services.Identity.IUserService, QMSFlowDoc.Infrastructure.Services.Identity.UserService>();
+builder.Services.AddScoped<QMSFlowDoc.Application.Services.Identity.IPermissionService, QMSFlowDoc.Infrastructure.Services.Identity.PermissionService>();
+builder.Services.AddScoped<QMSFlowDoc.Application.Services.Quality.IQualityService, QMSFlowDoc.Infrastructure.Services.Quality.QualityService>();
 
 builder.Services.ConfigureApplicationCookie(options => {
     options.LoginPath = "/login";
