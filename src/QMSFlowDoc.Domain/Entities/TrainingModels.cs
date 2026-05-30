@@ -17,7 +17,7 @@ public class TrainingActivity
     public string Title { get; set; } = string.Empty;
     public string? Provider { get; set; }
     
-    public Guid TrainingTypeId { get; set; }
+    public Guid? TrainingTypeId { get; set; }
     public TrainingTypeCatalog? TrainingType { get; set; }
     
     public string Modality { get; set; } = "PRESENCIAL"; // PRESENCIAL, ONLINE, MIXTA
@@ -33,7 +33,7 @@ public class TrainingActivity
     public string Status { get; set; } = "ACTIVO"; // ACTIVO, ANULADO
     public string? AnnulReason { get; set; }
     
-    public Guid CreatedByUserId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     

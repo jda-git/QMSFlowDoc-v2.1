@@ -15,7 +15,7 @@ public class CompetencyCatalog
     public int DefaultReassessmentMonths { get; set; } = 12;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public Guid CreatedByUserId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
 }
 
 public class CompetencyEvalTemplate
@@ -53,7 +53,7 @@ public class CompetencyEvaluation
     public CompetencyEvalTemplate? Template { get; set; }
     
     public DateTime EvaluationDate { get; set; }
-    public Guid EvaluatorStaffId { get; set; }
+    public Guid? EvaluatorStaffId { get; set; }
     
     public string Outcome { get; set; } = "COMPETENTE"; // COMPETENTE, NO_COMPETENTE, EN_FORMACION
     public DateTime? ValidUntil { get; set; }

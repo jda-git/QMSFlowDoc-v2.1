@@ -56,6 +56,11 @@ public class Nonconformity
     // V2: Optimistic concurrency
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
+    // Soft Delete
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public List<CapaAction> Actions { get; set; } = new();
 }
 
@@ -72,6 +77,11 @@ public class CapaAction
     public DateTime? CompletedAt { get; set; }
     public string? EffectivenessCheck { get; set; }
     public CAPAStatus Status { get; set; } = CAPAStatus.OPEN;
+
+    // Soft Delete
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
 }
 
 // === Quejas y Reclamaciones (ISO 15189 §7.7) ===
@@ -110,6 +120,11 @@ public class Complaint
 
     // V2: Optimistic concurrency
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    
+    // Soft Delete
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
     
     public List<ComplaintAction> Actions { get; set; } = new();
 }

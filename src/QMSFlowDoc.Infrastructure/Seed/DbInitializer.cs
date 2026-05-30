@@ -316,10 +316,11 @@ namespace QMSFlowDoc.Infrastructure.Seed
                     IsActive = true
                 };
 
-                var createAdminResult = await userManager.CreateAsync(admin, "Admin123!");
+                var createAdminResult = await userManager.CreateAsync(admin, "Qms@Dm1n2026!");
                 if (createAdminResult.Succeeded)
                 {
                     await userManager.AddToRoleAsync(admin, "Administrador");
+                    Console.WriteLine("⚠ SEGURIDAD: Usuario admin creado con contraseña por defecto. Cambie la contraseña inmediatamente en producción.");
                 }
             }
 
@@ -329,7 +330,7 @@ namespace QMSFlowDoc.Infrastructure.Seed
 
         private static async Task SeedDefaultRolePermissionsAsync(QmsDbContext context, RoleManager<ApplicationRole> roleManager)
         {
-            var sections = new[] { "Documents", "Inventory", "Staff", "Quality" };
+            var sections = new[] { "Documents", "Inventory", "Staff", "Quality", "Equipment" };
             
             var roles = await roleManager.Roles.ToListAsync();
             foreach (var role in roles)
@@ -345,7 +346,7 @@ namespace QMSFlowDoc.Infrastructure.Seed
                             RoleId = role.Id,
                             Section = section
                         };
-
+ 
                         if (role.Name == "Administrador")
                         {
                             rp.CanRead = true;
@@ -366,18 +367,9 @@ namespace QMSFlowDoc.Infrastructure.Seed
                         {
                             rp.CanRead = true;
                             rp.CanPrint = true;
-                            if (section == "Documents")
-                            {
-                                rp.CanCreate = false;
-                                rp.CanEdit = false;
-                                rp.CanDelete = false;
-                            }
-                            else
-                            {
-                                rp.CanCreate = true;
-                                rp.CanEdit = true;
-                                rp.CanDelete = false;
-                            }
+                            rp.CanCreate = true;
+                            rp.CanEdit = true;
+                            rp.CanDelete = false;
                         }
                         else if (role.Name == "Técnico")
                         {
@@ -403,6 +395,13 @@ namespace QMSFlowDoc.Infrastructure.Seed
                                 rp.CanEdit = true;
                                 rp.CanDelete = false;
                             }
+                            else if (section == "Equipment")
+                            {
+                                rp.CanPrint = true;
+                                rp.CanCreate = false; // Técnicos cannot register new equipment
+                                rp.CanEdit = true;   // But can register status, QC, calibration, repair
+                                rp.CanDelete = false;
+                            }
                             else
                             {
                                 rp.CanPrint = false;
@@ -414,7 +413,7 @@ namespace QMSFlowDoc.Infrastructure.Seed
                         else if (role.Name == "Auditor")
                         {
                             rp.CanRead = true;
-                            if (section == "Documents" || section == "Quality")
+                            if (section == "Documents" || section == "Quality" || section == "Equipment")
                             {
                                 rp.CanPrint = true;
                                 rp.CanCreate = false;
@@ -436,7 +435,7 @@ namespace QMSFlowDoc.Infrastructure.Seed
                                 rp.CanDelete = false;
                             }
                         }
-
+ 
                         context.RolePermissions.Add(rp);
                     }
                 }

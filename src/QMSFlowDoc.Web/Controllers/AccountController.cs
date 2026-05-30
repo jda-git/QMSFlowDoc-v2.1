@@ -21,13 +21,18 @@ namespace QMSFlowDoc.Web.Controllers
         {
             if (ModelState.IsValid)
             {
-                var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, model.RememberMe, lockoutOnFailure: false);
+                var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, model.RememberMe, lockoutOnFailure: true);
                 if (result.Succeeded)
                 {
                     return LocalRedirect(model.ReturnUrl ?? "/");
                 }
+
+                if (result.IsLockedOut)
+                {
+                    return Redirect($"/login?error=Cuenta bloqueada temporalmente por múltiples intentos fallidos. Inténtelo en 15 minutos.");
+                }
                 
-                return Redirect($"/login?error=Invalid login attempt");
+                return Redirect($"/login?error=Credenciales incorrectas");
             }
 
             return Redirect($"/login?error=Please provide username and password");

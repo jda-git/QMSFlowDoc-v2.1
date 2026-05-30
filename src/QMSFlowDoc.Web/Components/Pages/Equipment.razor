@@ -1,0 +1,2393 @@
+@page "/equipment"
+@rendermode InteractiveServer
+@using QMSFlowDoc.Application.Services.Equipment
+@using QMSFlowDoc.Shared.Models
+@using QMSFlowDoc.Shared.DTOs
+@using EquipmentStatus = QMSFlowDoc.Shared.Models.EquipmentStatus
+@using EquipmentCriticidad = QMSFlowDoc.Shared.Models.EquipmentCriticidad
+@using EquipmentAptitude = QMSFlowDoc.Shared.Models.EquipmentAptitude
+@using EquipmentIncident = QMSFlowDoc.Shared.Models.EquipmentIncident
+@using CalibrationOutcome = QMSFlowDoc.Shared.Models.CalibrationOutcome
+@using MaintenanceEventType = QMSFlowDoc.Shared.Models.MaintenanceEventType
+@using Microsoft.AspNetCore.Authorization
+@using QMSFlowDoc.Application.Services.Identity
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IEquipmentService EquipmentService
+@inject IJSRuntime JS
+@inject IPermissionService PermissionService
+
+<PageTitle>Gestión de Equipamiento — QMSFlowDoc</PageTitle>
+
+@if (!canRead)
+{
+    <div class="container py-4 no-print">
+        <div class="alert alert-danger p-4 rounded-4 shadow-sm border border-danger border-opacity-25 mt-4 text-center">
+            <i class="bi bi-shield-slash-fill fs-1 text-danger d-block mb-3"></i>
+            <h4 class="fw-bold">Acceso No Autorizado</h4>
+            <p class="text-muted mb-0">Su rol de usuario no tiene permisos de lectura para acceder a Equipamiento.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="equipment-page container-fluid py-4">
+        <!-- Header Panel -->
+        <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+            <div>
+                <h1 class="h3 fw-bold text-dark mb-1">
+                    <i class="bi bi-cpu text-primary me-2"></i>Gestión de Equipamiento
+                </h1>
+                <p class="text-muted mb-0">Ciclo de vida, metrología, calibración e incidencias de equipamiento técnico (ISO 15189:2022)</p>
+            </div>
+            <div class="d-flex gap-2">
+                @if (canCreate)
+                {
+                    <button class="btn btn-primary shadow-sm px-4" @onclick="OpenCreateModal">
+                        <i class="bi bi-plus-circle-fill me-2"></i>Registrar Equipo
+                    </button>
+                }
+            </div>
+        </div>
+
+        <!-- Dashboard Widgets -->
+        <div class="row g-3 mb-4 no-print">
+            <div class="col-md-2">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-primary h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block text-uppercase fw-semibold">Total Equipos</span>
+                            <h3 class="fw-bold mb-0 text-primary">@dashboard.TotalEquipments</h3>
+                        </div>
+                        <div class="widget-icon bg-primary-soft rounded-3 p-2 text-primary">
+                            <i class="bi bi-cpu-fill fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-danger h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block text-uppercase fw-semibold">Críticos</span>
+                            <h3 class="fw-bold mb-0 text-danger">@dashboard.CriticalEquipments</h3>
+                        </div>
+                        <div class="widget-icon bg-danger-soft rounded-3 p-2 text-danger">
+                            <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-success h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block text-uppercase fw-semibold">Operatividad</span>
+                            <h3 class="fw-bold mb-0 text-success">@dashboard.ActivePercentage.ToString("0.0")%</h3>
+                        </div>
+                        <div class="widget-icon bg-success-soft rounded-3 p-2 text-success">
+                            <i class="bi bi-check-circle-fill fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-warning h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block text-uppercase fw-semibold">Alertas Activas</span>
+                            <h3 class="fw-bold mb-0 text-warning">@dashboard.ActiveAlerts.Count</h3>
+                        </div>
+                        <div class="widget-icon bg-warning-soft rounded-3 p-2 text-warning">
+                            <i class="bi bi-bell-fill fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-info h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block text-uppercase fw-semibold">Disp. Citómetros</span>
+                            <h3 class="fw-bold mb-0 text-info">@dashboard.CytometersAvailability.ToString("0.0")%</h3>
+                        </div>
+                        <div class="widget-icon bg-info-soft rounded-3 p-2 text-info">
+                            <i class="bi bi-pie-chart-fill fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-secondary h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block text-uppercase fw-semibold">Inactividad CMF</span>
+                            <h3 class="fw-bold mb-0 text-secondary">@dashboard.CytometersDowntimeDays días</h3>
+                        </div>
+                        <div class="widget-icon bg-secondary-soft rounded-3 p-2 text-secondary">
+                            <i class="bi bi-clock-history fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Section -->
+        @if (dashboard.ActiveAlerts.Any())
+        {
+            <div class="alert-banner-container mb-4 no-print">
+                <div class="card border-0 shadow-sm bg-danger-soft p-3 rounded-4">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-exclamation-octagon-fill text-danger me-2 fs-4"></i>
+                        <h6 class="mb-0 text-danger fw-bold">Alertas de Calidad de Equipamiento que Requieren Atención</h6>
+                    </div>
+                    <div class="row g-2">
+                        @foreach (var alert in dashboard.ActiveAlerts.Take(4))
+                        {
+                            <div class="col-md-6">
+                                <div class="alert-item p-2 bg-white rounded-3 border-start border-3 border-danger small shadow-sm d-flex align-items-center">
+                                    <span class="badge bg-danger me-2">@alert.Type</span>
+                                    <span class="text-dark fw-semibold me-1">[@alert.EquipmentName]:</span>
+                                    <span class="text-muted">@alert.Message</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Main Workspace -->
+        <div class="row g-4">
+            <!-- Left Panel: Grid List -->
+            <div class="col-lg-7 no-print">
+                <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
+                    <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-list-stars text-primary me-2"></i>Inventario de Equipamiento</h5>
+                        <span class="badge bg-light text-dark rounded-pill">@filteredEquipments.Count() equipos</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <!-- Search & Advanced Filters -->
+                        <div class="px-4 py-3 bg-light border-bottom border-top border-light d-flex flex-column gap-2">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Buscar por nombre, ID interno, serie..." @bind="searchTerm" @bind:event="oninput" />
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select" @bind="filterCriticidad">
+                                        <option value="">Criticidad (Todas)</option>
+                                        <option value="CRITICAL">Crítico</option>
+                                        <option value="SEMICRITICAL">Semicrítico</option>
+                                        <option value="AUXILIARY">Auxiliar</option>
+                                        <option value="NON_CRITICAL">No Crítico</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select" @bind="filterCategory">
+                                        <option value="">Categorías (Todas)</option>
+                                        <option value="Citómetro">Citómetros</option>
+                                        <option value="Pipeta">Pipetas</option>
+                                        <option value="Nevera">Neveras/Congeladores</option>
+                                        <option value="Centrífuga">Centrífugas</option>
+                                        <option value="Software">Software</option>
+                                        <option value="Auxiliar">Equipos Auxiliares</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <select class="form-select" @bind="filterStatus">
+                                        <option value="">Estados (Todos)</option>
+                                        <option value="IN_SERVICE">En servicio</option>
+                                        <option value="PENDING_QC_VERIFICATION">Pendiente de QC/Verif.</option>
+                                        <option value="OUT_OF_SERVICE">Fuera de servicio</option>
+                                        <option value="PENDING_ACCEPTANCE">Pendiente de aceptación</option>
+                                        <option value="IN_MAINTENANCE">En mantenimiento</option>
+                                        <option value="IN_QUARANTINE">En cuarentena</option>
+                                        <option value="DECOMMISSIONED">Baja definitiva</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <select class="form-select" @bind="filterAptitude">
+                                        <option value="">Aptitud (Todas)</option>
+                                        <option value="APTO">Apto</option>
+                                        <option value="NO_APTO">No Apto</option>
+                                        <option value="CON_RESTRICCIONES">Apto con restricciones</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-center">
+                                    <div class="form-check form-switch mb-0 ms-2">
+                                        <input class="form-check-input" type="checkbox" id="showOnlyAlerts" @bind="showOnlyAlerts" />
+                                        <label class="form-check-label small fw-semibold text-muted" for="showOnlyAlerts">Sólo con alertas activas</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Equipment Grid/List -->
+                        @if (filteredEquipments == null || !filteredEquipments.Any())
+                        {
+                            <div class="p-5 text-center text-muted">
+                                <i class="bi bi-box-open fs-1 mb-3 d-block text-secondary"></i>
+                                <p class="mb-0">No se encontraron equipos que coincidan con los filtros aplicados.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="list-group list-group-flush list-scrollable" style="max-height: 600px; overflow-y: auto;">
+                                @foreach (var eq in filteredEquipments)
+                                {
+                                    var isSelected = selectedId == eq.Id;
+                                    <button type="button" @onclick="() => SelectEquipment(eq.Id)" class="list-group-item list-group-item-action p-3 d-flex justify-content-between align-items-start border-bottom border-light @(isSelected ? "bg-primary-soft border-start border-3 border-primary active-item" : "")">
+                                        <div class="d-flex flex-column gap-1 w-70">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="fw-bold text-dark">@eq.Name</span>
+                                                <span class="badge @(GetCriticidadBadgeClass(eq.Criticidad)) small">@GetCriticidadLabel(eq.Criticidad)</span>
+                                            </div>
+                                            <div class="d-flex flex-wrap gap-2 text-muted small mt-1">
+                                                <span><i class="bi bi-tag-fill me-1"></i>ID: <strong>@(eq.InternalId ?? "-")</strong></span>
+                                                <span><i class="bi bi-hash me-1"></i>N/S: @(eq.SerialNumber ?? "-")</span>
+                                                <span><i class="bi bi-geo-alt-fill me-1"></i>@eq.Location</span>
+                                            </div>
+                                            @if (eq.NextCalibration.HasValue)
+                                            {
+                                                <div class="small mt-1 text-muted">
+                                                    <i class="bi bi-calendar-event me-1"></i>Próx. Calibración:
+                                                    <span class="@(eq.NextCalibration.Value <= DateTime.Today ? "text-danger fw-bold" : "")">
+                                                        @eq.NextCalibration.Value.ToString("dd/MM/yyyy")
+                                                    </span>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="d-flex flex-column align-items-end gap-2">
+                                            <span class="badge @(GetStatusBadgeClass(eq.Status)) px-2 py-1">@eq.StatusFormatted</span>
+                                            <span class="badge @(GetAptitudeBadgeClass(eq.Aptitude)) px-2 py-1">@eq.Aptitude.ToString()</span>
+                                            @if (eq.ActiveAlertCount > 0)
+                                            {
+                                                <span class="badge bg-danger rounded-pill"><i class="bi bi-bell-fill me-1"></i>@eq.ActiveAlertCount</span>
+                                            }
+                                        </div>
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Tabs, Details and Lifecycles -->
+            <div class="col-lg-5 printable-content">
+                @if (details == null)
+                {
+                    <div class="card border-0 shadow-sm rounded-4 bg-white p-5 text-center text-muted h-100 no-print">
+                        <i class="bi bi-cpu fs-1 text-secondary mb-3 d-block"></i>
+                        <h5>Detalles del Equipo</h5>
+                        <p class="small">Seleccione un equipo de la lista para gestionar su ciclo de vida, ver especificaciones técnicas, metrología e incidencias.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
+                        <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0 fw-bold text-dark">
+                                    <i class="bi bi-file-earmark-medical-fill text-primary me-2"></i>Hoja de Vida de Equipo
+                                </h5>
+                                <small class="text-muted">@details.Equipment.Name (@details.Equipment.InternalId)</small>
+                            </div>
+                            <div class="d-flex gap-1 no-print">
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="PrintSheet" title="Imprimir Ficha Completa">
+                                    <i class="bi bi-printer-fill me-1"></i>Imprimir
+                                </button>
+                                @if (canEdit)
+                                {
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="OpenEditModal">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Status Alert on Details Panel -->
+                        @if (details.Equipment.Status == EquipmentStatus.OUT_OF_SERVICE || details.Equipment.Status == EquipmentStatus.IN_QUARANTINE || details.Equipment.Status == EquipmentStatus.QC_NON_CONFORMING)
+                        {
+                            <div class="alert alert-danger rounded-0 border-0 m-0 py-2 px-4 d-flex align-items-center gap-2">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <span class="small fw-semibold">El equipo está inoperativo por calibración vencida, avería o no conformidad de QC.</span>
+                            </div>
+                        }
+
+                        <div class="card-body p-0">
+                            <!-- Detail Tabs (Navigation) -->
+                            <div class="bg-light px-3 pt-2 border-bottom border-light no-print">
+                                <ul class="nav nav-tabs border-0 flex-nowrap" style="overflow-x: auto;">
+                                    <li class="nav-item">
+                                        <button class="nav-link border-0 @(detailTab == "info" ? "active fw-bold text-primary bg-white rounded-top" : "text-muted bg-transparent")" @onclick='() => detailTab = "info"'>Identificación</button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link border-0 @(detailTab == "specs" ? "active fw-bold text-primary bg-white rounded-top" : "text-muted bg-transparent")" @onclick='() => detailTab = "specs"'>Especificaciones</button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link border-0 @(detailTab == "acceptance" ? "active fw-bold text-primary bg-white rounded-top" : "text-muted bg-transparent")" @onclick='() => detailTab = "acceptance"'>Recepción</button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link border-0 @(detailTab == "metrology" ? "active fw-bold text-primary bg-white rounded-top" : "text-muted bg-transparent")" @onclick='() => detailTab = "metrology"'>Metrología</button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link border-0 @(detailTab == "incidents" ? "active fw-bold text-primary bg-white rounded-top" : "text-muted bg-transparent")" @onclick='() => detailTab = "incidents"'>Incidencias</button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link border-0 @(detailTab == "logs" ? "active fw-bold text-primary bg-white rounded-top" : "text-muted bg-transparent")" @onclick='() => detailTab = "logs"'>Registro Histórico</button>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Tab Contents -->
+                            <div class="p-4" style="max-height: 550px; overflow-y: auto;">
+                                @if (detailTab == "info")
+                                {
+                                    <!-- Identification and General Data -->
+                                    <div class="d-flex flex-column gap-3">
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">ID Interno Laboratorio</label>
+                                                <span class="fw-bold">@details.Equipment.InternalId</span>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Etiqueta Activo Fijo</label>
+                                                <span class="fw-bold">@details.Equipment.AssetTag</span>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Fabricante</label>
+                                                <span>@details.Equipment.Manufacturer</span>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Modelo</label>
+                                                <span>@details.Equipment.Model</span>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Número de Serie</label>
+                                                <span class="font-monospace">@details.Equipment.SerialNumber</span>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Ubicación física</label>
+                                                <span>@details.Equipment.Location</span>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 border-top border-light pt-2">
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Criticidad del equipo</label>
+                                                <span class="badge @(GetCriticidadBadgeClass(details.Equipment.Criticidad))">@GetCriticidadLabel(details.Equipment.Criticidad)</span>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Aptitud Clínica</label>
+                                                <span class="badge @(GetAptitudeBadgeClass(details.Equipment.Aptitude))">@details.Equipment.Aptitude.ToString()</span>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Fecha de Instalación</label>
+                                                <span>@details.Equipment.InstalledAt?.ToString("dd/MM/yyyy")</span>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="small text-muted d-block">Vto Garantía</label>
+                                                <span>@details.Equipment.WarrantyUntil?.ToString("dd/MM/yyyy")</span>
+                                            </div>
+                                        </div>
+                                        <div class="border-top border-light pt-2">
+                                            <label class="small text-muted d-block">Destino / Uso Previsto</label>
+                                            <p class="small text-dark mb-0">@details.Equipment.IntendedUse</p>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(details.Equipment.Notes))
+                                        {
+                                            <div class="bg-light p-2 rounded-3 small">
+                                                <strong>Notas:</strong> @details.Equipment.Notes
+                                            </div>
+                                        }
+
+                                        <!-- Direct Action Button Group (no-print) -->
+                                        <div class="border-top border-light pt-3 d-flex flex-wrap gap-2 no-print justify-content-end">
+                                            <button class="btn btn-outline-secondary btn-sm" @onclick="OpenStatusOverrideModal">Cambiar Estado</button>
+                                            @if (canEdit && details.Acceptance == null)
+                                            {
+                                                <button class="btn btn-warning btn-sm text-dark" @onclick="OpenAcceptanceWizard">Aceptación Inicial</button>
+                                            }
+                                            <button class="btn btn-outline-success btn-sm" @onclick="OpenQCDialog">Registrar QC</button>
+                                            <button class="btn btn-outline-info btn-sm text-dark" @onclick="OpenIncidentModal">Registrar Incidencia</button>
+                                            <button class="btn btn-outline-danger btn-sm" @onclick="OpenDecommissionModal">Dar de Baja</button>
+                                        </div>
+                                    </div>
+                                }
+                                else if (detailTab == "specs")
+                                {
+                                    <!-- Dynamic specifications view based on category -->
+                                    <div class="d-flex flex-column gap-3">
+                                        @if (!string.IsNullOrEmpty(details.Equipment.CytoType))
+                                        {
+                                            <h6 class="fw-bold border-bottom pb-1 text-primary"><i class="bi bi-diagram-3 me-2"></i>Especificaciones Citómetro de Flujo</h6>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Clase/Tipo</label>
+                                                    <span>@details.Equipment.CytoType</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Láseres (Número)</label>
+                                                    <span>@details.Equipment.CytoLasersCount</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Longitudes de onda</label>
+                                                    <span>@details.Equipment.CytoWavelengths nm</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Detectores (Número)</label>
+                                                    <span>@details.Equipment.CytoDetectorsCount</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Software Adquisición</label>
+                                                    <span>@details.Equipment.CytoAcquisitionSoftware v@(details.Equipment.CytoAcquisitionSoftwareVersion)</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Ordenador de Adquisición</label>
+                                                    <span>@details.Equipment.CytoAssociatedComputer</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-12">
+                                                    <label class="small text-muted d-block">Ruta de exportación FCS</label>
+                                                    <span class="font-monospace text-muted small">@details.Equipment.CytoFcsExportPath</span>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (!string.IsNullOrEmpty(details.Equipment.PipetteType))
+                                        {
+                                            <h6 class="fw-bold border-bottom pb-1 text-primary"><i class="bi bi-droplet-fill me-2"></i>Especificaciones de Pipetas / Dispensadores</h6>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Tipo de Pipeta</label>
+                                                    <span>@details.Equipment.PipetteType</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Volumen Nominal</label>
+                                                    <span>@details.Equipment.PipetteNominalVolume μL</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Rango de Volumen</label>
+                                                    <span>@details.Equipment.PipetteVolumeRange μL</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Resolución</label>
+                                                    <span>@details.Equipment.PipetteResolution μL</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-12">
+                                                    <label class="small text-muted d-block">Límite de Error Máximo Permisible (L.E.M.P.)</label>
+                                                    <span>@details.Equipment.PipetteEmpLimit</span>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (details.Equipment.ColdTempMin.HasValue)
+                                        {
+                                            <h6 class="fw-bold border-bottom pb-1 text-primary"><i class="bi bi-thermometer-snow me-2"></i>Especificaciones Nevera / Congelador</h6>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Temperatura Mínima</label>
+                                                    <span>@details.Equipment.ColdTempMin °C</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Temperatura Máxima</label>
+                                                    <span>@details.Equipment.ColdTempMax °C</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Código Sensor Asociado</label>
+                                                    <span>@details.Equipment.ColdSensorAssociated</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Registro de temperatura</label>
+                                                    <span>@details.Equipment.ColdTempRecordType</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <span class="badge @(details.Equipment.ColdHasAlarm ? "bg-success" : "bg-warning")">@(details.Equipment.ColdHasAlarm ? "Dispone de Alarma remota" : "Sin alarma remota")</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <span class="badge @(details.Equipment.ColdHasBackup ? "bg-success" : "bg-warning")">@(details.Equipment.ColdHasBackup ? "Dispone de Sistema Backup CO2/N2" : "Sin backup de frío")</span>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (!string.IsNullOrEmpty(details.Equipment.SoftName))
+                                        {
+                                            <h6 class="fw-bold border-bottom pb-1 text-primary"><i class="bi bi-file-earmark-code-fill me-2"></i>Especificaciones Software / LIS</h6>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Nombre Aplicación</label>
+                                                    <span>@details.Equipment.SoftName</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Fabricante / Editor</label>
+                                                    <span>@details.Equipment.SoftManufacturer</span>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Versión Instalada</label>
+                                                    <span>@details.Equipment.SoftVersion</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="small text-muted d-block">Estado de Validación</label>
+                                                    <span class="badge bg-info">@details.Equipment.SoftValidationState</span>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <p class="text-muted small">No se han registrado parámetros o especificaciones adicionales para esta categoría de equipo.</p>
+                                        }
+                                    </div>
+                                }
+                                else if (detailTab == "acceptance")
+                                {
+                                    <!-- Reception and Initial acceptance checks -->
+                                    <div class="d-flex flex-column gap-3">
+                                        @if (details.Acceptance == null)
+                                        {
+                                            <div class="alert alert-warning text-center small p-3 rounded-4">
+                                                <i class="bi bi-exclamation-triangle-fill fs-3 text-warning d-block mb-2"></i>
+                                                <strong>Equipo Pendiente de Aceptación</strong>
+                                                <p class="mb-0 text-muted mt-1">Este equipo no cuenta con registro de control de recepción ni instalación formal.</p>
+                                                @if (canEdit)
+                                                {
+                                                    <button class="btn btn-primary btn-sm mt-3 px-3" @onclick="OpenAcceptanceWizard">Realizar Aceptación</button>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="border-bottom pb-2">
+                                                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-box-seam me-2 text-primary"></i>1. Control de Recepción</h6>
+                                                <div class="row g-2 small mt-1">
+                                                    <div class="col-6"><strong>Fecha Recepción:</strong> @details.Acceptance.ReceptionDate?.ToString("dd/MM/yyyy")</div>
+                                                    <div class="col-6"><strong>Estado Físico:</strong> @details.Acceptance.ReceptionCondition</div>
+                                                    <div class="col-4"><i class="bi @(details.Acceptance.PackagingCorrect ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") me-1"></i>Embalaje Correcto</div>
+                                                    <div class="col-4"><i class="bi @(!details.Acceptance.VisualDamage ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") me-1"></i>Daños Visuales</div>
+                                                    <div class="col-4"><i class="bi @(details.Acceptance.AccessoriesReceived ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") me-1"></i>Accesorios Recibidos</div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border-bottom pb-2">
+                                                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-tools me-2 text-primary"></i>2. Instalación Técnica</h6>
+                                                <div class="row g-2 small mt-1">
+                                                    <div class="col-6"><strong>Fecha Instalación:</strong> @details.Acceptance.InstallationDate?.ToString("dd/MM/yyyy")</div>
+                                                    <div class="col-6"><strong>Instalado por:</strong> @details.Acceptance.InstalledBy</div>
+                                                    <div class="col-6"><i class="bi @(details.Acceptance.AmbientConditionsCorrect ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") me-1"></i>Cond. Ambientales OK</div>
+                                                    <div class="col-6"><i class="bi @(details.Acceptance.ConnectionsCorrect ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") me-1"></i>Conexiones Eléctricas OK</div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-shield-check me-2 text-primary"></i>3. Aceptación Clínica y Entrada en Servicio</h6>
+                                                <div class="row g-2 small mt-1">
+                                                    <div class="col-6"><strong>Fecha Decisión:</strong> @details.Acceptance.AcceptanceDate?.ToString("dd/MM/yyyy")</div>
+                                                    <div class="col-6"><strong>Entrada en Servicio:</strong> @details.Acceptance.ServiceEntryDate?.ToString("dd/MM/yyyy")</div>
+                                                    <div class="col-12"><strong>Resultado:</strong> <span class="badge bg-success">@details.Acceptance.AcceptanceOutcome</span></div>
+                                                    @if (!string.IsNullOrEmpty(details.Acceptance.AcceptanceRestrictions))
+                                                    {
+                                                        <div class="col-12 text-danger"><strong>Restricciones:</strong> @details.Acceptance.AcceptanceRestrictions</div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (detailTab == "metrology")
+                                {
+                                    <!-- Metrology: Calibration plans, records, maintenance -->
+                                    <div class="d-flex flex-column gap-4">
+                                        <!-- Maintenance plan and log -->
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center border-bottom pb-1">
+                                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-calendar-check me-2 text-success"></i>Planes y Eventos de Mantenimiento</h6>
+                                                <button class="btn btn-outline-success btn-xs no-print" @onclick="OpenRegisterMaintModal"><i class="bi bi-plus-circle"></i> Reg. Evento</button>
+                                            </div>
+                                            @if (details.MaintenanceEvents == null || !details.MaintenanceEvents.Any())
+                                            {
+                                                <p class="text-muted small mt-2">No se han registrado eventos de mantenimiento preventivo o correctivo.</p>
+                                            }
+                                            else
+                                            {
+                                                <div class="table-responsive mt-2">
+                                                    <table class="table table-sm table-hover small">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Fecha</th>
+                                                                <th>Tipo</th>
+                                                                <th>Resultado</th>
+                                                                <th>Técnico</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var ev in details.MaintenanceEvents.Take(5))
+                                                            {
+                                                                <tr>
+                                                                    <td>@ev.PerformedAt.ToString("dd/MM/yyyy")</td>
+                                                                    <td>@ev.EventType.ToString()</td>
+                                                                    <td><span class="badge @(ev.Outcome == "Pass" || ev.Outcome == "Exitoso" ? "bg-success" : "bg-danger")">@ev.Outcome</span></td>
+                                                                    <td>@ev.PerformedByUserName</td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            }
+                                        </div>
+
+                                        <!-- Calibration plans and logs -->
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center border-bottom pb-1">
+                                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-rulers me-2 text-warning"></i>Plan y Registros de Calibración</h6>
+                                                <div class="d-flex gap-1 no-print">
+                                                    <button class="btn btn-outline-warning text-dark btn-xs" @onclick="OpenAddCalPlanModal"><i class="bi bi-plus-circle"></i> Nuevo Plan</button>
+                                                    <button class="btn btn-outline-primary btn-xs" @onclick="OpenAddCalRecordModal"><i class="bi bi-plus-circle"></i> Registrar Cal.</button>
+                                                </div>
+                                            </div>
+
+                                            @if (details.CalibrationPlans == null || !details.CalibrationPlans.Any())
+                                            {
+                                                <p class="text-muted small mt-2">No se han definido planes de calibración metrológica para este equipo.</p>
+                                            }
+                                            else
+                                            {
+                                                <div class="bg-light p-2 rounded-3 small mt-2">
+                                                    <strong>Planes Activos:</strong>
+                                                    @foreach (var cp in details.CalibrationPlans)
+                                                    {
+                                                        <div class="mt-1 d-flex justify-content-between">
+                                                            <span><i class="bi bi-pin-angle-fill me-1 text-warning"></i>@cp.ControlledMagnitude (frecuencia: @(cp.FrequencyMonths)m)</span>
+                                                            <span class="text-muted">tolerancia: @cp.Tolerance</span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+
+                                            @if (details.CalibrationRecords == null || !details.CalibrationRecords.Any())
+                                            {
+                                                <p class="text-muted small mt-2">No se han cargado certificados ni registros de calibración.</p>
+                                            }
+                                            else
+                                            {
+                                                <div class="table-responsive mt-2">
+                                                    <table class="table table-sm table-hover small">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Fecha</th>
+                                                                <th>Magnitud</th>
+                                                                <th>Error</th>
+                                                                <th>Estado</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var cal in details.CalibrationRecords.Take(5))
+                                                            {
+                                                                <tr>
+                                                                    <td>@cal.PerformedAt.ToString("dd/MM/yyyy")</td>
+                                                                    <td>@cal.Magnitude</td>
+                                                                    <td>@cal.ObservedError</td>
+                                                                    <td><span class="badge @(cal.Outcome == CalibrationOutcome.APTO ? "bg-success" : "bg-danger")">@cal.Outcome.ToString()</span></td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else if (detailTab == "incidents")
+                                {
+                                    <!-- Technical incidents and repairs -->
+                                    <div class="d-flex flex-column gap-3">
+                                        <div class="d-flex justify-content-between align-items-center border-bottom pb-1">
+                                            <h6 class="fw-bold text-dark mb-0"><i class="bi bi-lightning-charge-fill me-2 text-danger"></i>Historial de Incidencias Técnicas</h6>
+                                            <button class="btn btn-outline-danger btn-xs no-print" @onclick="OpenIncidentModal"><i class="bi bi-plus-circle"></i> Reg. Incidencia</button>
+                                        </div>
+
+                                        @if (details.Incidents == null || !details.Incidents.Any())
+                                        {
+                                            <p class="text-muted small mt-2">No se han registrado incidencias técnicas para este equipo.</p>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var inc in details.Incidents)
+                                            {
+                                                <div class="border-bottom pb-2 mt-1 small">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span class="fw-bold text-danger"><i class="bi bi-exclamation-triangle me-1"></i>@inc.IncidentType (@inc.Severity)</span>
+                                                        <span class="text-muted">@inc.IncidentDate.ToString("dd/MM/yyyy")</span>
+                                                    </div>
+                                                    <p class="mb-1 text-muted">@inc.Description</p>
+                                                    <div class="d-flex gap-2 justify-content-end mt-1 no-print">
+                                                        @if (inc.RequiresRepair && !details.RepairRecords.Any(r => r.DetectionDate == inc.IncidentDate))
+                                                        {
+                                                            <button class="btn btn-xs btn-outline-danger" @onclick="() => OpenRegisterRepairModal(inc)">Registrar Reparación</button>
+                                                        }
+                                                        @if (inc.RequiresImpactAssessment && !details.ImpactAssessments.Any(i => i.IncidentId == inc.Id))
+                                                        {
+                                                            <button class="btn btn-xs btn-outline-warning text-dark" @onclick="() => OpenImpactModal(inc)">Evaluar Impacto</button>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                                else if (detailTab == "logs")
+                                {
+                                    <!-- History status logs and audit trails -->
+                                    <div class="d-flex flex-column gap-3">
+                                        <h6 class="fw-bold text-dark border-bottom pb-1 mb-0"><i class="bi bi-clock-history me-2 text-secondary"></i>Log de Cambios de Estado y Trazabilidad</h6>
+                                        @if (details.StatusHistory == null || !details.StatusHistory.Any())
+                                        {
+                                            <p class="text-muted small">No se registran cambios automáticos o manuales en el estado del equipo.</p>
+                                        }
+                                        else
+                                        {
+                                            <div class="status-timeline small" style="max-height: 250px; overflow-y: auto;">
+                                                @foreach (var h in details.StatusHistory)
+                                                {
+                                                    <div class="border-start border-2 border-light ps-3 pb-2 position-relative">
+                                                        <div class="position-absolute rounded-circle bg-primary" style="width: 10px; height: 10px; left: -6px; top: 6px;"></div>
+                                                        <div class="d-flex justify-content-between">
+                                                            <span class="fw-semibold text-primary">@h.OldStatus.ToString() &rarr; @h.NewStatus.ToString()</span>
+                                                            <span class="text-muted small">@h.Date.ToString("dd/MM/yyyy HH:mm")</span>
+                                                        </div>
+                                                        <p class="mb-0 text-muted mt-1">@h.Reason</p>
+                                                        <small class="text-muted">Modificado por: <strong>@h.UserName</strong></small>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+
+                                        <h6 class="fw-bold text-dark border-bottom pb-1 mb-0 mt-2"><i class="bi bi-shield-check me-2 text-secondary"></i>Trazabilidad de Firma y Auditoría</h6>
+                                        @if (details.AuditHistory == null || !details.AuditHistory.Any())
+                                        {
+                                            <p class="text-muted small">No se registran firmas de auditoría de este equipo.</p>
+                                        }
+                                        else
+                                        {
+                                            <div class="audit-history small" style="max-height: 200px; overflow-y: auto;">
+                                                @foreach (var a in details.AuditHistory)
+                                                {
+                                                    <div class="border-bottom py-1 border-light">
+                                                        <div class="d-flex justify-content-between">
+                                                            <strong>@a.ActionType</strong>
+                                                            <span class="text-muted small">@a.Date.ToString("dd/MM/yyyy HH:mm")</span>
+                                                        </div>
+                                                        <span class="text-muted d-block">@a.Description</span>
+                                                        <small class="text-secondary">Usuario responsable: @a.UserName</small>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: Create / Edit Equipment -->
+    @if (showCreateEditModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content rounded-4 border-0 shadow-lg">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">@(isEditing ? "Modificar Equipo" : "Registrar Nuevo Equipo")</h5>
+                        <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
+                    </div>
+                    <div class="modal-body p-4" style="max-height: 500px; overflow-y: auto;">
+                        <EditForm Model="@formModel" OnValidSubmit="SaveEquipment">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger small" />
+
+                            <h6 class="fw-bold border-bottom pb-1 mb-3 text-primary">Identificación del Equipo</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Nombre de Equipo</label>
+                                    <input type="text" class="form-control" @bind="formModel.Name" required />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-semibold">ID Interno Lab</label>
+                                    <input type="text" class="form-control" @bind="formModel.InternalId" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-semibold">Etiqueta Activo Fijo</label>
+                                    <input type="text" class="form-control" @bind="formModel.AssetTag" />
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Fabricante</label>
+                                    <input type="text" class="form-control" @bind="formModel.Manufacturer" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Modelo</label>
+                                    <input type="text" class="form-control" @bind="formModel.Model" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Número de Serie</label>
+                                    <input type="text" class="form-control font-monospace" @bind="formModel.SerialNumber" />
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Ubicación</label>
+                                    <input type="text" class="form-control" @bind="formModel.Location" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Área Laboratorio</label>
+                                    <input type="text" class="form-control" @bind="formModel.AreaLaboratorio" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Criticidad</label>
+                                    <select class="form-select" @bind="formModel.Criticidad">
+                                        <option value="CRITICAL">Crítico</option>
+                                        <option value="SEMICRITICAL">Semicrítico</option>
+                                        <option value="AUXILIARY">Auxiliar</option>
+                                        <option value="NON_CRITICAL">No Crítico</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Fecha de Compra</label>
+                                    <input type="date" class="form-control" @bind="formModel.PurchaseDate" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Fecha de Instalación</label>
+                                    <input type="date" class="form-control" @bind="formModel.InstalledAt" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Vencimiento de Garantía</label>
+                                    <input type="date" class="form-control" @bind="formModel.WarrantyUntil" />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Uso Previsto del Equipo</label>
+                                <textarea class="form-control" rows="2" @bind="formModel.IntendedUse"></textarea>
+                            </div>
+
+                            <!-- Selector de tipo de equipamiento para specs específicas -->
+                            <h6 class="fw-bold border-bottom pb-1 mb-3 mt-4 text-primary">Especificaciones Específicas por Tipo de Dispositivo</h6>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-muted">Tipo de Equipo para Formulario Dinámico</label>
+                                <select class="form-select bg-light" @bind="selectedSpecType">
+                                    <option value="">Ninguno (Equipo Estándar)</option>
+                                    <option value="CYTOMETER">Citómetro de Flujo</option>
+                                    <option value="PIPETTE">Pipeta / Dispensador</option>
+                                    <option value="COLD">Nevera / Congelador / Termobloque</option>
+                                    <option value="SOFTWARE">Software / LIS / Middleware</option>
+                                </select>
+                            </div>
+
+                            @if (selectedSpecType == "CYTOMETER")
+                            {
+                                <div class="row g-2 mb-3 bg-light p-3 rounded-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold">Tipo Citómetro</label>
+                                        <input type="text" class="form-control bg-white" placeholder="Ej: Convencional / Espectral" @bind="formModel.CytoType" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold">Número de Láseres</label>
+                                        <input type="number" class="form-control bg-white" @bind="formModel.CytoLasersCount" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold">Longitudes de onda</label>
+                                        <input type="text" class="form-control bg-white" placeholder="488, 638, 405" @bind="formModel.CytoWavelengths" />
+                                    </div>
+                                    <div class="col-md-4 mt-2">
+                                        <label class="form-label small fw-semibold">Detectores (Canales)</label>
+                                        <input type="number" class="form-control bg-white" @bind="formModel.CytoDetectorsCount" />
+                                    </div>
+                                    <div class="col-md-8 mt-2">
+                                        <label class="form-label small fw-semibold">Software Adquisición</label>
+                                        <input type="text" class="form-control bg-white" placeholder="Nombre y versión software" @bind="formModel.CytoAcquisitionSoftware" />
+                                    </div>
+                                </div>
+                            }
+                            else if (selectedSpecType == "PIPETTE")
+                            {
+                                <div class="row g-2 mb-3 bg-light p-3 rounded-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold">Tipo de Pipeta</label>
+                                        <input type="text" class="form-control bg-white" placeholder="Monocanal / Multicanal" @bind="formModel.PipetteType" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold">Volumen Nominal (μL)</label>
+                                        <input type="number" step="0.01" class="form-control bg-white" @bind="formModel.PipetteNominalVolume" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-semibold">Rango Volumen (μL)</label>
+                                        <input type="text" class="form-control bg-white" placeholder="20-200" @bind="formModel.PipetteVolumeRange" />
+                                    </div>
+                                    <div class="col-md-12 mt-2">
+                                        <label class="form-label small fw-semibold">Límite Error Máximo Permisible (L.E.M.P.)</label>
+                                        <input type="text" class="form-control bg-white" placeholder="Ej: ±1.0% volumen nominal" @bind="formModel.PipetteEmpLimit" />
+                                    </div>
+                                </div>
+                            }
+                            else if (selectedSpecType == "COLD")
+                            {
+                                <div class="row g-2 mb-3 bg-light p-3 rounded-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">Temp Mínima (°C)</label>
+                                        <input type="number" step="0.1" class="form-control bg-white" @bind="formModel.ColdTempMin" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">Temp Máxima (°C)</label>
+                                        <input type="number" step="0.1" class="form-control bg-white" @bind="formModel.ColdTempMax" />
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <label class="form-label small fw-semibold">Registro de Temperatura</label>
+                                        <input type="text" class="form-control bg-white" placeholder="Continuo / Diario" @bind="formModel.ColdTempRecordType" />
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <label class="form-label small fw-semibold">Código Sensor Asociado</label>
+                                        <input type="text" class="form-control bg-white" placeholder="S-04" @bind="formModel.ColdSensorAssociated" />
+                                    </div>
+                                </div>
+                            }
+                            else if (selectedSpecType == "SOFTWARE")
+                            {
+                                <div class="row g-2 mb-3 bg-light p-3 rounded-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">Nombre Software</label>
+                                        <input type="text" class="form-control bg-white" @bind="formModel.SoftName" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold">Versión</label>
+                                        <input type="text" class="form-control bg-white" @bind="formModel.SoftVersion" />
+                                    </div>
+                                    <div class="col-md-12 mt-2">
+                                        <label class="form-label small fw-semibold">Estado de Validación Técnica (ISO 15189)</label>
+                                        <input type="text" class="form-control bg-white" placeholder="Validado / En validación" @bind="formModel.SoftValidationState" />
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="modal-footer border-0 bg-light mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="CloseCreateModal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 2: Acceptance Initial Wizard -->
+    @if (showAcceptanceWizard)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Aceptación Inicial de Equipamiento (ISO 15189)</h5>
+                        <button type="button" class="btn-close" @onclick="() => showAcceptanceWizard = false"></button>
+                    </div>
+                    <div class="modal-body p-4" style="max-height: 500px; overflow-y: auto;">
+                        <!-- Step Navigation -->
+                        <div class="d-flex justify-content-between mb-4 bg-light p-2 rounded-3">
+                            <span class="fw-bold @(acceptanceStep == 1 ? "text-primary" : "text-muted")">1. Recepción Física</span>
+                            <span>&rarr;</span>
+                            <span class="fw-bold @(acceptanceStep == 2 ? "text-primary" : "text-muted")">2. Instalación Técnica</span>
+                            <span>&rarr;</span>
+                            <span class="fw-bold @(acceptanceStep == 3 ? "text-primary" : "text-muted")">3. Aceptación del Servicio</span>
+                        </div>
+
+                        <EditForm Model="@acceptanceModel" OnValidSubmit="SaveAcceptanceStep">
+                            @if (acceptanceStep == 1)
+                            {
+                                <div>
+                                    <h6 class="fw-bold text-dark border-bottom pb-1">Control de Recepción Física y Documental</h6>
+                                    <div class="row g-3 mt-1">
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Fecha de Recepción</label>
+                                            <input type="date" class="form-control" @bind="acceptanceModel.ReceptionDate" required />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Condición del Material Recibido</label>
+                                            <input type="text" class="form-control" placeholder="Ej: Embalaje intacto, sin daños" @bind="acceptanceModel.ReceptionCondition" />
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pack" @bind="acceptanceModel.PackagingCorrect" />
+                                                <label class="form-check-label small" for="pack">Embalaje Correcto</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="damage" @bind="acceptanceModel.VisualDamage" />
+                                                <label class="form-check-label small text-danger" for="damage">¿Presenta Daños Visuales?</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="access" @bind="acceptanceModel.AccessoriesReceived" />
+                                                <label class="form-check-label small" for="access">Accesorios Completos</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label class="form-label small fw-semibold">Notas de Recepción</label>
+                                        <textarea class="form-control" rows="2" @bind="acceptanceModel.ReceptionNotes"></textarea>
+                                    </div>
+                                </div>
+                            }
+                            else if (acceptanceStep == 2)
+                            {
+                                <div>
+                                    <h6 class="fw-bold text-dark border-bottom pb-1">Verificación de Instalación e Infraestructura</h6>
+                                    <div class="row g-3 mt-1">
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Fecha de Instalación</label>
+                                            <input type="date" class="form-control" @bind="acceptanceModel.InstallationDate" required />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Instalador Técnico (Firma/Empresa)</label>
+                                            <input type="text" class="form-control" @bind="acceptanceModel.InstalledBy" />
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="ambient" @bind="acceptanceModel.AmbientConditionsCorrect" />
+                                                <label class="form-check-label small" for="ambient">Condiciones Ambientales Correctas (Temp/Humedad)</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="conn" @bind="acceptanceModel.ConnectionsCorrect" />
+                                                <label class="form-check-label small" for="conn">Conexiones y Red Eléctrica Estables</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mt-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="pwr" @bind="acceptanceModel.InitialPowerOnCorrect" />
+                                                <label class="form-check-label small" for="pwr">Encendido Inicial Exitoso (Power On)</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mt-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="comm" @bind="acceptanceModel.SoftwareCommunicationCorrect" />
+                                                <label class="form-check-label small" for="comm">Comunicación Software / LIS Correcta</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label class="form-label small fw-semibold">Observaciones de la Instalación</label>
+                                        <textarea class="form-control" rows="2" @bind="acceptanceModel.InstallationNotes"></textarea>
+                                    </div>
+                                </div>
+                            }
+                            else if (acceptanceStep == 3)
+                            {
+                                <div>
+                                    <h6 class="fw-bold text-dark border-bottom pb-1 text-danger">Decisión de Aceptación del Servicio Clínico</h6>
+                                    <div class="row g-3 mt-1">
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Fecha de Aceptación / Aprobación</label>
+                                            <input type="date" class="form-control" @bind="acceptanceModel.AcceptanceDate" required />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Fecha de Entrada en Servicio Clínico</label>
+                                            <input type="date" class="form-control" @bind="acceptanceModel.ServiceEntryDate" required />
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Resultado de Aceptación</label>
+                                            <select class="form-select" @bind="acceptanceModel.AcceptanceOutcome" required>
+                                                <option value="Aceptado">Aceptado - Apto para uso diagnóstico</option>
+                                                <option value="Aceptado con Restricciones">Aceptado con Restricciones</option>
+                                                <option value="Rechazado">Rechazado - Devuelto a proveedor</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">Restricciones de Uso (si aplica)</label>
+                                            <input type="text" class="form-control" @bind="acceptanceModel.AcceptanceRestrictions" />
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label class="form-label small fw-semibold">Justificación o Criterios de Aceptación Cumplidos</label>
+                                        <textarea class="form-control" rows="3" @bind="acceptanceModel.AcceptanceNotes" placeholder="Especifique los criterios de aceptación clínica aplicados..." required></textarea>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="modal-footer border-0 bg-light mt-4 d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="PrevAcceptanceStep" disabled="@(acceptanceStep == 1)">Atrás</button>
+                                <button type="submit" class="btn btn-primary">@(acceptanceStep == 3 ? "Finalizar Aceptación" : "Siguiente")</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 3: Manual Status Override / Change -->
+    @if (showStatusOverrideModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Modificar Estado Clínico/Operativo</h5>
+                        <button type="button" class="btn-close" @onclick="() => showStatusOverrideModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        @if (!string.IsNullOrEmpty(statusValidationMessage))
+                        {
+                            <div class="alert alert-danger small p-2 rounded-3 mb-3">
+                                <i class="bi bi-x-circle-fill me-1"></i>@statusValidationMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Nuevo Estado Operativo</label>
+                            <select class="form-select" @bind="overrideStatus">
+                                <option value="IN_SERVICE">En servicio (Apto)</option>
+                                <option value="IN_SERVICE_WITH_RESTRICTIONS">En servicio con restricciones</option>
+                                <option value="OUT_OF_SERVICE">Fuera de servicio (Averiado/Vencido)</option>
+                                <option value="IN_MAINTENANCE">En mantenimiento preventivo</option>
+                                <option value="IN_REPAIR">En reparación técnica</option>
+                                <option value="IN_QUARANTINE">En cuarentena preventiva</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Justificación del Cambio de Estado</label>
+                            <textarea class="form-control" rows="3" @bind="overrideReason" placeholder="Especifique el motivo del cambio de estado..." required></textarea>
+                        </div>
+                        <div class="modal-footer border-0 p-0 mt-4">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => showStatusOverrideModal = false">Cancelar</button>
+                            <button type="button" class="btn btn-primary" @onclick="SaveStatusOverride">Aplicar Cambio</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 4: Daily QC Dialog -->
+    @if (showQCDialog)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Registrar Control de Calidad / Verificación Funcional</h5>
+                        <button type="button" class="btn-close" @onclick="() => showQCDialog = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@qcModel" OnValidSubmit="SaveQC">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Número de Lote / Calibrador</label>
+                                <input type="text" class="form-control" @bind="qcModel.LotNumber" placeholder="Lote de microesferas, calibrador..." required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Resultado de la verificación</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="qcpass" id="qcpass_t" @onclick="() => qcModel.IsPass = true" checked="@(qcModel.IsPass)" />
+                                    <label class="form-check-label text-success fw-bold small" for="qcpass_t">CONFORME (Pasa el control)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="qcpass" id="qcpass_f" @onclick="() => qcModel.IsPass = false" checked="@(!qcModel.IsPass)" />
+                                    <label class="form-check-label text-danger fw-bold small" for="qcpass_f">NO CONFORME (Falla el control)</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Estado Final del Equipo</label>
+                                <select class="form-select" @bind="qcModel.EquipmentEndStatus">
+                                    <option value="IN_SERVICE">En servicio</option>
+                                    <option value="IN_SERVICE_WITH_RESTRICTIONS">En servicio con restricciones</option>
+                                    <option value="QC_NON_CONFORMING">QC no conforme (Inoperativo)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Notas / Parámetros Evaluados (CVs, Intensidades)</label>
+                                <textarea class="form-control" rows="3" @bind="qcModel.Notes" placeholder="Especifique CVs, MFI de alineación, voltajes, etc."></textarea>
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showQCDialog = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar QC</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 5: Register Maintenance Event -->
+    @if (showRegisterMaintModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Registrar Evento de Mantenimiento</h5>
+                        <button type="button" class="btn-close" @onclick="() => showRegisterMaintModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@maintModel" OnValidSubmit="SaveMaintenance">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Tipo de Evento</label>
+                                    <select class="form-select" @bind="maintModel.EventType" required>
+                                        <option value="PREVENTIVE">Preventivo</option>
+                                        <option value="CORRECTIVE">Correctivo (Reparación)</option>
+                                        <option value="CALIBRATION">Calibración</option>
+                                        <option value="VERIFICATION">Verificación</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Fecha de Realización</label>
+                                    <input type="date" class="form-control" @bind="maintModel.PerformedAt" required />
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Resultado / Dictamen</label>
+                                    <input type="text" class="form-control" @bind="maintModel.Outcome" placeholder="Ej: Conforme / Sin incidencias / Exitoso" required />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-semibold">Costo (€)</label>
+                                    <input type="number" step="0.01" class="form-control" @bind="maintModel.Cost" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-semibold">Estado Final Equipo</label>
+                                    <select class="form-select" @bind="maintModel.EndStatus">
+                                        <option value="IN_SERVICE">En servicio</option>
+                                        <option value="IN_SERVICE_WITH_RESTRICTIONS">En servicio con restricciones</option>
+                                        <option value="OUT_OF_SERVICE">Fuera de servicio</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Actividades Realizadas / Observaciones</label>
+                                <textarea class="form-control" rows="3" @bind="maintModel.ActivitiesPerformed" required></textarea>
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showRegisterMaintModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Mantenimiento</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 6: Add Calibration Plan -->
+    @if (showAddCalPlanModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Definir Plan de Calibración / Verificación</h5>
+                        <button type="button" class="btn-close" @onclick="() => showAddCalPlanModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@calPlanModel" OnValidSubmit="SaveCalPlan">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Magnitud Controlada (Temperatura, Volumen, etc.)</label>
+                                <input type="text" class="form-control" @bind="calPlanModel.ControlledMagnitude" placeholder="Ej: Volumen (Monocanal)" required />
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Frecuencia (Meses)</label>
+                                    <input type="number" class="form-control" @bind="calPlanModel.FrequencyMonths" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Tolerancia Aceptable</label>
+                                    <input type="text" class="form-control" @bind="calPlanModel.Tolerance" placeholder="Ej: ±2.0% LEMP" required />
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Método o Proveedor Recomendado</label>
+                                <input type="text" class="form-control" @bind="calPlanModel.ProviderOrMethod" placeholder="Ej: Laboratorio acreditado ENAC" />
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showAddCalPlanModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Plan</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 7: Register Calibration Record -->
+    @if (showAddCalRecordModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Registrar Certificado de Calibración / Metrología</h5>
+                        <button type="button" class="btn-close" @onclick="() => showAddCalRecordModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@calRecordModel" OnValidSubmit="SaveCalRecord">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Magnitud Calibrada</label>
+                                    <input type="text" class="form-control" @bind="calRecordModel.Magnitude" placeholder="Ej: Volumen / Temperatura" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Fecha Calibración</label>
+                                    <input type="date" class="form-control" @bind="calRecordModel.PerformedAt" required />
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Error Máximo Observado</label>
+                                    <input type="text" class="form-control" @bind="calRecordModel.ObservedError" placeholder="Ej: +0.12 μL" required />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">Incertidumbre (k=2)</label>
+                                    <input type="text" class="form-control" @bind="calRecordModel.Uncertainty" placeholder="Ej: ±0.05 μL" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-semibold">L.E.M.P. Tolerado</label>
+                                    <input type="text" class="form-control" @bind="calRecordModel.MaxPermissibleError" placeholder="Ej: ±0.20 μL" required />
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Resultado Dictamen</label>
+                                    <select class="form-select" @bind="calRecordModel.Outcome" required>
+                                        <option value="APTO">APTO (Error inferior a tolerancia)</option>
+                                        <option value="APTO_CON_RESTRICCIONES">APTO con restricciones</option>
+                                        <option value="NO_APTO">NO APTO (Error superior a tolerancia)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Fecha Próximo Vencimiento</label>
+                                    <input type="date" class="form-control" @bind="calRecordModel.NextDueDate" required />
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Ruta o Enlace al Certificado Oficial (Firma ENAC)</label>
+                                <input type="text" class="form-control" @bind="calRecordModel.CertificatePath" placeholder="http://servidor/certificados/cal-123.pdf" />
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showAddCalRecordModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Calibración</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 8: Register Incident -->
+    @if (showIncidentModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Registrar Incidencia Técnica</h5>
+                        <button type="button" class="btn-close" @onclick="() => showIncidentModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@incidentModel" OnValidSubmit="SaveIncident">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Tipo / Categoría de la Incidencia</label>
+                                <input type="text" class="form-control" @bind="incidentModel.IncidentType" placeholder="Ej: Error de láser / Desviación de temperatura / Obstrucción" required />
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Fecha Incidencia</label>
+                                    <input type="date" class="form-control" @bind="incidentModel.IncidentDate" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Severidad</label>
+                                    <select class="form-select" @bind="incidentModel.Severity" required>
+                                        <option value="Baja">Baja (Sin impacto operativo)</option>
+                                        <option value="Media">Media (Restricciones temporales)</option>
+                                        <option value="Alta">Alta (Inoperatividad parcial/total)</option>
+                                        <option value="Crítica">Crítica (Fallo metrológico grave)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Descripción del Problema Técnico</label>
+                                <textarea class="form-control" rows="3" @bind="incidentModel.Description" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Acción Inmediata de Contención</label>
+                                <input type="text" class="form-control" @bind="incidentModel.ImmediateAction" placeholder="Ej: Apagado y colocación de cartel fuera de servicio" required />
+                            </div>
+                            <div class="row mt-3 mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="reqrep" @bind="incidentModel.RequiresRepair" />
+                                        <label class="form-check-label small" for="reqrep">Requiere Reparación / Servicio Técnico</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="reqimp" @bind="incidentModel.RequiresImpactAssessment" />
+                                        <label class="form-check-label small text-danger" for="reqimp">Requiere Evaluación de Impacto en Resultados</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showIncidentModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Incidencia</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 9: Register Repair -->
+    @if (showRegisterRepairModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Registrar Reparación / Intervención del SAT</h5>
+                        <button type="button" class="btn-close" @onclick="() => showRegisterRepairModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@repairModel" OnValidSubmit="SaveRepair">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Fecha de Intervención</label>
+                                    <input type="date" class="form-control" @bind="repairModel.InterventionDate" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Técnico que realiza la reparación</label>
+                                    <input type="text" class="form-control" @bind="repairModel.PerformedBy" placeholder="Ej: SAT Oficial BD / Beckman Coulter" required />
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Descripción del Trabajo Realizado</label>
+                                <textarea class="form-control" rows="3" @bind="repairModel.InterventionDescription" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Piezas Reemplazadas / Modificaciones</label>
+                                <input type="text" class="form-control" @bind="repairModel.PartsReplaced" placeholder="Ej: Tarjeta láser azul / Mangueras fluidica" />
+                            </div>
+                            <div class="row mt-3 mb-3">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="modconf" @bind="repairModel.ConfigurationModified" />
+                                        <label class="form-check-label small" for="modconf">Modificación de Configuración</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="updsoft" @bind="repairModel.SoftwareUpdated" />
+                                        <label class="form-check-label small" for="updsoft">Actualización de Software</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="verreq" @bind="repairModel.VerificationRequired" disabled />
+                                        <label class="form-check-label small text-danger" for="verreq">Requiere Verificación Funcional Obligatoria</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showRegisterRepairModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Reparación</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 10: Register Impact Assessment -->
+    @if (showImpactModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Evaluación de Impacto en Resultados Diagnósticos</h5>
+                        <button type="button" class="btn-close" @onclick="() => showImpactModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@impactModel" OnValidSubmit="SaveImpact">
+                            <h6 class="fw-bold text-danger"><i class="bi bi-person-exclamation me-1"></i>Análisis Retrospectivo de Resultados y Trazabilidad</h6>
+                            <p class="small text-muted">Evalúe si la desviación metrológica o avería ha podido afectar a los resultados entregados a pacientes (ISO 15189:2022 §8.7).</p>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Último Control de Calidad Conforme</label>
+                                    <input type="date" class="form-control" @bind="impactModel.LastConformingVerificationDate" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Inicio Estimado de la Desviación</label>
+                                    <input type="date" class="form-control" @bind="impactModel.ProbableStartDateOfProblem" />
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Periodo Potencialmente Afectado</label>
+                                    <input type="text" class="form-control" @bind="impactModel.PotentiallyAffectedPeriod" placeholder="Ej: 24 horas / 3 lotes de muestras" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Magnitud del Impacto Clínico</label>
+                                    <select class="form-select" @bind="impactModel.ImpactType" required>
+                                        <option value="Sin impacto esperado">Sin impacto clínico esperado (calibradores correctos)</option>
+                                        <option value="Impacto Menor">Impacto Menor (sin cambio de diagnóstico)</option>
+                                        <option value="Impacto Mayor / Posible Error">Impacto Mayor (requiere reanálisis de muestras)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Justificación Técnica del Análisis de Impacto</label>
+                                <textarea class="form-control" rows="3" @bind="impactModel.Justification" placeholder="Escriba los argumentos científicos/metrológicos que justifican la decisión..." required></textarea>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Decisión Adoptada</label>
+                                    <select class="form-select" @bind="impactModel.Decision" required>
+                                        <option value="Sin acciones adicionales">Aceptar resultados previos - Sin acciones adicionales</option>
+                                        <option value="Reanálisis y comunicación">Reanálisis retrospectivo de muestras y comunicación a clínicos</option>
+                                        <option value="Apertura NC Externa">Derivación y apertura de No Conformidad Mayor</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="extnc" @bind="impactModel.RequiresExternalReview" />
+                                        <label class="form-check-label small fw-bold text-danger" for="extnc">Requiere notificar a Calidad y abrir CAPA asociada</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showImpactModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Evaluación</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 11: Register Decommission (Retirar / Baja / Cuarentena) -->
+    @if (showDecommissionModal)
+    {
+        <div class="modal fade show d-block bg-dark bg-opacity-50 no-print" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content rounded-4 border-0">
+                    <div class="modal-header bg-light border-0">
+                        <h5 class="modal-title fw-bold text-dark">Retirar del Servicio o Baja de Equipo</h5>
+                        <button type="button" class="btn-close" @onclick="() => showDecommissionModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@decommissionModel" OnValidSubmit="SaveDecommission">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Tipo de Retirada</label>
+                                <select class="form-select" @bind="decommissionModel.Type" required>
+                                    <option value="Cuarentena">Puesta en cuarentena (Fallo crítico)</option>
+                                    <option value="Retirado temporal">Retirado del servicio temporalmente</option>
+                                    <option value="Baja definitiva">Baja definitiva por obsolescencia</option>
+                                    <option value="Devuelto">Devolución a proveedor</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Fecha de Efecto</label>
+                                <input type="date" class="form-control" @bind="decommissionModel.Date" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Destino del Equipo / Ubicación de Custodia</label>
+                                <input type="text" class="form-control" @bind="decommissionModel.Destination" placeholder="Ej: Almacén de residuos / Custodia del SAT / Devuelto" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Motivo detallado de la Baja / Retirada</label>
+                                <textarea class="form-control" rows="3" @bind="decommissionModel.Reason" required></textarea>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="form-check bg-warning-soft p-2 rounded-3">
+                                        <input class="form-check-input ms-1" type="checkbox" id="decont" @bind="decommissionModel.RequiresDecontamination" />
+                                        <label class="form-check-label small fw-bold text-dark ms-2" for="decont">Requiere Certificado de Descontaminación Biológica (Pipetas, Citómetros, Cabinas)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            @if (decommissionModel.RequiresDecontamination)
+                            {
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="decontdone" @bind="decommissionModel.DecontaminationPerformed" />
+                                        <label class="form-check-label small text-success" for="decontdone">Descontaminación Biológica realizada y documentada</label>
+                                    </div>
+                                </div>
+                            }
+                            <div class="modal-footer border-0 p-0 mt-4">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => showDecommissionModal = false">Cancelar</button>
+                                <button type="submit" class="btn btn-danger text-white">Confirmar Retirada</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<!-- Style Tokens & Print Stylesheet -->
+<style>
+    .bg-primary-soft { background-color: rgba(13, 110, 253, 0.08) !important; }
+    .bg-danger-soft { background-color: rgba(220, 53, 69, 0.08) !important; }
+    .bg-success-soft { background-color: rgba(25, 135, 84, 0.08) !important; }
+    .bg-warning-soft { background-color: rgba(255, 193, 7, 0.08) !important; }
+    .bg-info-soft { background-color: rgba(13, 202, 240, 0.08) !important; }
+    .bg-secondary-soft { background-color: rgba(108, 117, 125, 0.08) !important; }
+    
+    .active-item {
+        box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.15);
+    }
+    
+    .list-scrollable::-webkit-scrollbar {
+        width: 6px;
+    }
+    .list-scrollable::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 0.25rem;
+    }
+
+    /* ===== PRINT MEDIA STYLE OPTIMIZATIONS ===== */
+    @@media print {
+        body { 
+            background: white !important; 
+            color: black !important; 
+            font-size: 11pt !important;
+        }
+        
+        .no-print, nav, .sidebar, .btn, .btn-premium, .modal, .modal-backdrop, .alert-banner-container, .card-header .btn { 
+            display: none !important; 
+        }
+
+        .printable-content {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        
+        .card-body {
+            padding: 0 !important;
+        }
+
+        .nav-tabs {
+            display: none !important; /* Hide tabs header */
+        }
+        
+        /* Expand all tab contents to print them on a single flow document */
+        .tab-content, .p-4 {
+            overflow: visible !important;
+            max-height: none !important;
+            padding: 0 !important;
+        }
+
+        /* Custom layout for printed equipment sheet */
+        .equipment-page {
+            padding: 0 !important;
+        }
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private Guid currentUserId = Guid.Empty;
+    private string currentUserName = "";
+    private bool canRead = false;
+    private bool canCreate = false;
+    private bool canEdit = false;
+    private bool canDelete = false;
+    private bool canPrint = false;
+
+    private List<EquipmentListDto> equipments = new();
+    private EquipmentDashboardDto dashboard = new();
+    private EquipmentDetailDto? details = null;
+
+    private Guid? selectedId = null;
+    private string searchTerm = "";
+    private string filterCriticidad = "";
+    private string filterCategory = "";
+    private string filterStatus = "";
+    private string filterAptitude = "";
+    private bool showOnlyAlerts = false;
+
+    private string detailTab = "info";
+
+    // Modals visibility
+    private bool showCreateEditModal = false;
+    private bool isEditing = false;
+    private string selectedSpecType = "";
+
+    private bool showAcceptanceWizard = false;
+    private int acceptanceStep = 1;
+
+    private bool showStatusOverrideModal = false;
+    private EquipmentStatus overrideStatus = EquipmentStatus.IN_SERVICE;
+    private string overrideReason = "";
+    private string statusValidationMessage = "";
+
+    private bool showQCDialog = false;
+    private bool showRegisterMaintModal = false;
+    private bool showAddCalPlanModal = false;
+    private bool showAddCalRecordModal = false;
+    private bool showIncidentModal = false;
+    private bool showRegisterRepairModal = false;
+    private bool showImpactModal = false;
+    private bool showDecommissionModal = false;
+
+    // Form Models
+    private CreateEquipmentRequest formModel = new();
+    private RegisterAcceptanceRequest acceptanceModel = new();
+    private CreateDailyQCRequest qcModel = new();
+    private RegisterMaintenanceRequest maintModel = new();
+    private RegisterCalibrationPlanRequest calPlanModel = new();
+    private RegisterCalibrationRecordRequest calRecordModel = new();
+    private RegisterIncidentRequest incidentModel = new();
+    private RegisterRepairRequest repairModel = new();
+    private RegisterImpactRequest impactModel = new();
+    private RegisterDecommissionRequest decommissionModel = new();
+
+    private IEnumerable<EquipmentListDto> filteredEquipments =>
+        equipments.Where(e =>
+            (string.IsNullOrWhiteSpace(searchTerm) || 
+             e.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+             (e.InternalId ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+             (e.SerialNumber ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+             (string.IsNullOrWhiteSpace(filterCriticidad) || e.Criticidad.ToString() == filterCriticidad) &&
+             (string.IsNullOrWhiteSpace(filterStatus) || e.Status.ToString() == filterStatus) &&
+             (string.IsNullOrWhiteSpace(filterAptitude) || e.Aptitude.ToString() == filterAptitude) &&
+             (string.IsNullOrWhiteSpace(filterCategory) || MatchesCategory(e, filterCategory)) &&
+             (!showOnlyAlerts || e.ActiveAlertCount > 0)
+        );
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            currentUserName = user.Identity?.Name ?? "Usuario";
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var uId))
+                currentUserId = uId;
+
+            var perms = await PermissionService.GetPermissionsForUserAsync(user, "Equipment");
+            canRead = perms.CanRead;
+            canCreate = perms.CanCreate;
+            canEdit = perms.CanEdit;
+            canDelete = perms.CanDelete;
+            canPrint = perms.CanPrint;
+        }
+
+        if (canRead)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        equipments = await EquipmentService.GetEquipmentsAsync();
+        dashboard = await EquipmentService.GetDashboardStatsAsync();
+        if (selectedId.HasValue)
+        {
+            details = await EquipmentService.GetEquipmentDetailsAsync(selectedId.Value);
+        }
+    }
+
+    private async Task SelectEquipment(Guid id)
+    {
+        selectedId = id;
+        details = await EquipmentService.GetEquipmentDetailsAsync(id);
+        detailTab = "info";
+    }
+
+    private bool MatchesCategory(EquipmentListDto eq, string category)
+    {
+        if (category == "Citómetro")
+            return eq.Name.Contains("Citómetro", StringComparison.OrdinalIgnoreCase) || (eq.Restrictions ?? "").Contains("Citómetro", StringComparison.OrdinalIgnoreCase);
+        if (category == "Pipeta")
+            return eq.Name.Contains("Pipeta", StringComparison.OrdinalIgnoreCase) || eq.Name.Contains("Micropipeta", StringComparison.OrdinalIgnoreCase);
+        if (category == "Nevera")
+            return eq.Name.Contains("Nevera", StringComparison.OrdinalIgnoreCase) || eq.Name.Contains("Congelador", StringComparison.OrdinalIgnoreCase);
+        if (category == "Centrífuga")
+            return eq.Name.Contains("Centrífuga", StringComparison.OrdinalIgnoreCase);
+        if (category == "Software")
+            return eq.Name.Contains("Software", StringComparison.OrdinalIgnoreCase) || eq.Name.Contains("Infinicyt", StringComparison.OrdinalIgnoreCase) || eq.Name.Contains("Kaluza", StringComparison.OrdinalIgnoreCase);
+        if (category == "Auxiliar")
+            return eq.Criticidad == EquipmentCriticidad.AUXILIARY;
+        return true;
+    }
+
+    private string GetCriticidadLabel(EquipmentCriticidad criticidad) => criticidad switch
+    {
+        EquipmentCriticidad.CRITICAL => "Crítico",
+        EquipmentCriticidad.SEMICRITICAL => "Semicrítico",
+        EquipmentCriticidad.AUXILIARY => "Auxiliar",
+        EquipmentCriticidad.NON_CRITICAL => "No Crítico",
+        _ => criticidad.ToString()
+    };
+
+    private string GetCriticidadBadgeClass(EquipmentCriticidad criticidad) => criticidad switch
+    {
+        EquipmentCriticidad.CRITICAL => "bg-danger",
+        EquipmentCriticidad.SEMICRITICAL => "bg-warning text-dark",
+        EquipmentCriticidad.AUXILIARY => "bg-info text-dark",
+        EquipmentCriticidad.NON_CRITICAL => "bg-secondary",
+        _ => "bg-dark"
+    };
+
+    private string GetStatusBadgeClass(EquipmentStatus status) => status switch
+    {
+        EquipmentStatus.IN_SERVICE => "bg-success",
+        EquipmentStatus.IN_SERVICE_WITH_RESTRICTIONS => "bg-info text-dark",
+        EquipmentStatus.PENDING_QC_VERIFICATION => "bg-warning text-dark",
+        EquipmentStatus.OUT_OF_SERVICE => "bg-danger",
+        EquipmentStatus.IN_QUARANTINE => "bg-danger",
+        EquipmentStatus.DECOMMISSIONED => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    private string GetAptitudeBadgeClass(EquipmentAptitude aptitude) => aptitude switch
+    {
+        EquipmentAptitude.APTO => "bg-success-soft text-success border border-success border-opacity-25",
+        EquipmentAptitude.CON_RESTRICCIONES => "bg-warning-soft text-warning border border-warning border-opacity-25",
+        EquipmentAptitude.NO_APTO => "bg-danger-soft text-danger border border-danger border-opacity-25",
+        _ => "bg-light text-dark"
+    };
+
+    private void OpenCreateModal()
+    {
+        formModel = new CreateEquipmentRequest();
+        selectedSpecType = "";
+        isEditing = false;
+        showCreateEditModal = true;
+    }
+
+    private void OpenEditModal()
+    {
+        if (details == null) return;
+        var eq = details.Equipment;
+        formModel = new UpdateEquipmentRequest
+        {
+            Id = eq.Id,
+            Name = eq.Name,
+            InternalId = eq.InternalId,
+            AssetTag = eq.AssetTag,
+            Manufacturer = eq.Manufacturer,
+            Model = eq.Model,
+            SerialNumber = eq.SerialNumber,
+            Location = eq.Location,
+            AreaLaboratorio = eq.AreaLaboratorio,
+            Criticidad = (EquipmentCriticidad)eq.Criticidad,
+            IntendedUse = eq.IntendedUse,
+            InstalledAt = eq.InstalledAt,
+            PurchaseDate = eq.PurchaseDate,
+            WarrantyUntil = eq.WarrantyUntil,
+            Notes = eq.Notes,
+            
+            // Specs
+            CytoType = eq.CytoType,
+            CytoLasersCount = eq.CytoLasersCount,
+            CytoWavelengths = eq.CytoWavelengths,
+            CytoDetectorsCount = eq.CytoDetectorsCount,
+            CytoAcquisitionSoftware = eq.CytoAcquisitionSoftware,
+            CytoAssociatedComputer = eq.CytoAssociatedComputer,
+            CytoFcsExportPath = eq.CytoFcsExportPath,
+
+            PipetteType = eq.PipetteType,
+            PipetteNominalVolume = eq.PipetteNominalVolume,
+            PipetteVolumeRange = eq.PipetteVolumeRange,
+            PipetteEmpLimit = eq.PipetteEmpLimit,
+
+            ColdTempMin = eq.ColdTempMin,
+            ColdTempMax = eq.ColdTempMax,
+            ColdSensorAssociated = eq.ColdSensorAssociated,
+            ColdTempRecordType = eq.ColdTempRecordType,
+
+            SoftName = eq.SoftName,
+            SoftVersion = eq.SoftVersion,
+            SoftValidationState = eq.SoftValidationState
+        };
+
+        if (!string.IsNullOrEmpty(eq.CytoType)) selectedSpecType = "CYTOMETER";
+        else if (!string.IsNullOrEmpty(eq.PipetteType)) selectedSpecType = "PIPETTE";
+        else if (eq.ColdTempMin.HasValue) selectedSpecType = "COLD";
+        else if (!string.IsNullOrEmpty(eq.SoftName)) selectedSpecType = "SOFTWARE";
+        else selectedSpecType = "";
+
+        isEditing = true;
+        showCreateEditModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        showCreateEditModal = false;
+    }
+
+    private async Task SaveEquipment()
+    {
+        try
+        {
+            if (isEditing)
+            {
+                var updateReq = (UpdateEquipmentRequest)formModel;
+                await EquipmentService.UpdateEquipmentAsync(updateReq.Id, updateReq, currentUserId, currentUserName);
+            }
+            else
+            {
+                var newId = await EquipmentService.CreateEquipmentAsync(formModel, currentUserId, currentUserName);
+                selectedId = newId;
+            }
+            showCreateEditModal = false;
+            await LoadData();
+            if (selectedId.HasValue)
+            {
+                await SelectEquipment(selectedId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error al guardar equipo: {ex.Message}");
+        }
+    }
+
+    private void OpenAcceptanceWizard()
+    {
+        if (details == null) return;
+        acceptanceModel = new RegisterAcceptanceRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            ReceptionDate = DateTime.Today,
+            InstallationDate = DateTime.Today,
+            AcceptanceDate = DateTime.Today,
+            ServiceEntryDate = DateTime.Today,
+            AcceptanceOutcome = "Aceptado",
+            PackagingCorrect = true,
+            AmbientConditionsCorrect = true,
+            ConnectionsCorrect = true,
+            InitialPowerOnCorrect = true,
+            SoftwareCommunicationCorrect = true,
+            CriteriaDefined = true
+        };
+        acceptanceStep = 1;
+        showAcceptanceWizard = true;
+    }
+
+    private void PrevAcceptanceStep() => acceptanceStep--;
+    private async Task SaveAcceptanceStep()
+    {
+        if (acceptanceStep < 3)
+        {
+            acceptanceStep++;
+        }
+        else
+        {
+            // Submit
+            try
+            {
+                var ok = await EquipmentService.RegisterAcceptanceAsync(acceptanceModel, currentUserId, currentUserName);
+                if (ok)
+                {
+                    showAcceptanceWizard = false;
+                    await LoadData();
+                    await JS.InvokeVoidAsync("alert", "Registro de aceptación completado correctamente. El equipo ha sido dado de alta en servicio.");
+                }
+            }
+            catch (Exception ex)
+            {
+                await JS.InvokeVoidAsync("alert", $"Error al guardar aceptación: {ex.Message}");
+            }
+        }
+    }
+
+    private void OpenStatusOverrideModal()
+    {
+        if (details == null) return;
+        overrideStatus = (EquipmentStatus)details.Equipment.Status;
+        overrideReason = "";
+        statusValidationMessage = "";
+        showStatusOverrideModal = true;
+    }
+
+    private async Task SaveStatusOverride()
+    {
+        if (details == null) return;
+        if (string.IsNullOrWhiteSpace(overrideReason))
+        {
+            statusValidationMessage = "La justificación del cambio de estado es obligatoria.";
+            return;
+        }
+
+        try
+        {
+            var ok = await EquipmentService.UpdateEquipmentStatusAsync(details.Equipment.Id, overrideStatus, overrideReason, currentUserId);
+            if (ok)
+            {
+                showStatusOverrideModal = false;
+                await LoadData();
+            }
+            else
+            {
+                statusValidationMessage = "Transición de estado no autorizada. Verifique las reglas ISO (ej. Equipos críticos requieren aceptación previa antes de ser puestos en servicio).";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusValidationMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void OpenQCDialog()
+    {
+        if (details == null) return;
+        qcModel = new CreateDailyQCRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            LotNumber = "",
+            IsPass = true,
+            EquipmentEndStatus = EquipmentStatus.IN_SERVICE,
+            UserId = currentUserId,
+            PerformedAt = DateTime.UtcNow
+        };
+        showQCDialog = true;
+    }
+
+    private async Task SaveQC()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterQCAsync(qcModel);
+            if (ok)
+            {
+                showQCDialog = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenRegisterMaintModal()
+    {
+        if (details == null) return;
+        maintModel = new RegisterMaintenanceRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            PerformedAt = DateTime.Today,
+            EventType = MaintenanceEventType.PREVENTIVE,
+            IsInternal = true,
+            Outcome = "Exitoso",
+            EndStatus = EquipmentStatus.IN_SERVICE,
+            UserId = currentUserId
+        };
+        showRegisterMaintModal = true;
+    }
+
+    private async Task SaveMaintenance()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterMaintenanceAsync(maintModel);
+            if (ok)
+            {
+                showRegisterMaintModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenAddCalPlanModal()
+    {
+        if (details == null) return;
+        calPlanModel = new RegisterCalibrationPlanRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            ControlledMagnitude = "",
+            FrequencyMonths = 12,
+            Tolerance = "",
+            ProviderOrMethod = ""
+        };
+        showAddCalPlanModal = true;
+    }
+
+    private async Task SaveCalPlan()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterCalibrationPlanAsync(calPlanModel);
+            if (ok)
+            {
+                showAddCalPlanModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenAddCalRecordModal()
+    {
+        if (details == null) return;
+        calRecordModel = new RegisterCalibrationRecordRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            PerformedAt = DateTime.Today,
+            Magnitude = "",
+            ObservedError = "",
+            MaxPermissibleError = "",
+            Uncertainty = "",
+            Outcome = CalibrationOutcome.APTO,
+            NextDueDate = DateTime.Today.AddYears(1),
+            UserId = currentUserId
+        };
+        showAddCalRecordModal = true;
+    }
+
+    private async Task SaveCalRecord()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterCalibrationRecordAsync(calRecordModel);
+            if (ok)
+            {
+                showAddCalRecordModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenIncidentModal()
+    {
+        if (details == null) return;
+        incidentModel = new RegisterIncidentRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            IncidentDate = DateTime.Today,
+            IncidentType = "",
+            Description = "",
+            Severity = "Baja",
+            ImmediateStatus = EquipmentStatus.OUT_OF_SERVICE,
+            ImmediateAction = "",
+            RequiresRepair = true,
+            RequiresImpactAssessment = true,
+            UserId = currentUserId
+        };
+        showIncidentModal = true;
+    }
+
+    private async Task SaveIncident()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterIncidentAsync(incidentModel);
+            if (ok)
+            {
+                showIncidentModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenRegisterRepairModal(EquipmentIncident inc)
+    {
+        if (details == null) return;
+        repairModel = new RegisterRepairRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            DetectionDate = inc.IncidentDate,
+            ProblemDescription = inc.Description,
+            DetectedDuring = "Incidencia técnica",
+            Severity = inc.Severity,
+            EquipmentRemovedFromService = true,
+            RemovedFromServiceDate = inc.IncidentDate,
+            InterventionDate = DateTime.Today,
+            InterventionDescription = "",
+            PartsReplaced = "",
+            VerificationRequired = true,
+            VerificationPerformed = false,
+            EndStatus = EquipmentStatus.PENDING_QC_VERIFICATION, // Forces verification flow
+            UserId = currentUserId
+        };
+        showRegisterRepairModal = true;
+    }
+
+    private async Task SaveRepair()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterRepairAsync(repairModel);
+            if (ok)
+            {
+                showRegisterRepairModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenImpactModal(EquipmentIncident inc)
+    {
+        if (details == null) return;
+        impactModel = new RegisterImpactRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            IncidentId = inc.Id,
+            LastConformingVerificationDate = DateTime.Today.AddDays(-7),
+            ProbableStartDateOfProblem = inc.IncidentDate,
+            PotentiallyAffectedPeriod = "1 día",
+            ImpactType = "Sin impacto esperado",
+            Decision = "Sin acciones adicionales",
+            Justification = "",
+            EndStatus = EquipmentStatus.IN_SERVICE,
+            UserId = currentUserId
+        };
+        showImpactModal = true;
+    }
+
+    private async Task SaveImpact()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterImpactAssessmentAsync(impactModel);
+            if (ok)
+            {
+                showImpactModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenDecommissionModal()
+    {
+        if (details == null) return;
+        decommissionModel = new RegisterDecommissionRequest
+        {
+            EquipmentId = details.Equipment.Id,
+            Type = "Cuarentena",
+            Reason = "",
+            Date = DateTime.Today,
+            Destination = "",
+            RequiresDecontamination = true,
+            DecontaminationPerformed = false,
+            UserId = currentUserId
+        };
+        showDecommissionModal = true;
+    }
+
+    private async Task SaveDecommission()
+    {
+        try
+        {
+            var ok = await EquipmentService.RegisterDecommissionAsync(decommissionModel);
+            if (ok)
+            {
+                showDecommissionModal = false;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task PrintSheet()
+    {
+        if (!canPrint)
+        {
+            await JS.InvokeVoidAsync("alert", "No tiene permisos para imprimir.");
+            return;
+        }
+        await JS.InvokeVoidAsync("window.print");
+    }
+}

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QMSFlowDoc.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using QMSFlowDoc.Infrastructure.Persistence;
 namespace QMSFlowDoc.Infrastructure.Migrations
 {
     [DbContext(typeof(QmsDbContext))]
-    partial class QmsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260530183720_AddEquipmentMetrologyAndLifecycle")]
+    partial class AddEquipmentMetrologyAndLifecycle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -294,6 +297,7 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedByUserId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
@@ -356,12 +360,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DeletedByUserId")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -371,9 +369,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
 
                     b.Property<string>("EffectivenessCheck")
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("NCId")
                         .HasColumnType("TEXT");
@@ -477,6 +472,7 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedByUserId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int>("DefaultReassessmentMonths")
@@ -574,6 +570,7 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EvaluatorStaffId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EvidenceDocId")
@@ -643,12 +640,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DeletedByUserId")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -664,9 +655,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
 
                     b.Property<string>("InvestigationResult")
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsSubstantiated")
                         .HasColumnType("INTEGER");
@@ -2566,12 +2554,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                     b.Property<string>("Containment")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DeletedByUserId")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -2583,9 +2565,6 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("ImpactPatient")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Origin")
@@ -2859,6 +2838,7 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("GrantedByUserId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("RevocationReason")
@@ -3182,6 +3162,7 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedByUserId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Credits")
@@ -3225,6 +3206,7 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TrainingTypeId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -3834,7 +3816,8 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                     b.HasOne("QMSFlowDoc.Domain.Identity.ApplicationUser", "GrantedByUser")
                         .WithMany()
                         .HasForeignKey("GrantedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("QMSFlowDoc.Domain.Entities.StaffProfile", "Staff")
                         .WithMany("Authorizations")
@@ -3920,7 +3903,8 @@ namespace QMSFlowDoc.Infrastructure.Migrations
                     b.HasOne("QMSFlowDoc.Domain.Entities.TrainingTypeCatalog", "TrainingType")
                         .WithMany()
                         .HasForeignKey("TrainingTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("TrainingType");
                 });

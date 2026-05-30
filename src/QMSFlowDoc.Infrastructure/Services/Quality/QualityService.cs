@@ -4,6 +4,10 @@ using QMSFlowDoc.Infrastructure.Persistence;
 using QMSFlowDoc.Shared.DTOs;
 using DomainEntities = QMSFlowDoc.Domain.Entities;
 using SharedModels = QMSFlowDoc.Shared.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace QMSFlowDoc.Infrastructure.Services.Quality;
 
@@ -21,6 +25,7 @@ public class QualityService : IQualityService
     public async Task<List<NCListDto>> GetNonconformitiesAsync()
     {
         return await _context.Nonconformities
+            .Where(n => !n.IsDeleted)
             .Include(n => n.Actions)
             .OrderByDescending(n => n.DetectedAt)
             .Select(n => new NCListDto
@@ -31,7 +36,7 @@ public class QualityService : IQualityService
                 Severity = (SharedModels.NCSeverity)n.Severity,
                 Status = (SharedModels.NCStatus)n.Status,
                 ImpactPatient = n.ImpactPatient,
-                ActionCount = n.Actions.Count,
+                ActionCount = n.Actions.Count(a => !a.IsDeleted),
                 Origin = n.Origin,
                 RootCauseAnalysis = n.RootCauseAnalysis
             })
@@ -42,7 +47,7 @@ public class QualityService : IQualityService
     {
         var nc = await _context.Nonconformities
             .Include(n => n.Actions)
-            .FirstOrDefaultAsync(n => n.Id == id);
+            .FirstOrDefaultAsync(n => n.Id == id && !n.IsDeleted);
 
         if (nc == null) return null;
 
@@ -55,7 +60,7 @@ public class QualityService : IQualityService
 
         // Fetch user names for actions
         var actionDtos = new List<SharedModels.CapaAction>();
-        foreach (var a in nc.Actions)
+        foreach (var a in nc.Actions.Where(x => !x.IsDeleted))
         {
             string? actionClosedByName = null;
             if (a.ClosedByUserId.HasValue)
@@ -100,7 +105,7 @@ public class QualityService : IQualityService
         };
     }
 
-    public async Task<Guid> CreateNCAsync(CreateNCRequest request)
+    public async Task<Guid> CreateNCAsync(CreateNCRequest request, Guid? userId = null, string? userName = null)
     {
         var nc = new DomainEntities.Nonconformity
         {
@@ -120,13 +125,17 @@ public class QualityService : IQualityService
 
         _context.Nonconformities.Add(nc);
         await _context.SaveChangesAsync();
+
+        await LogAuditAsync("CREATE", "Nonconformity", nc.Id, $"NC '{nc.Title}' creada", userId, userName);
+        await _context.SaveChangesAsync();
+
         return nc.Id;
     }
 
-    public async Task<bool> UpdateNCAsync(Guid id, CreateNCRequest request)
+    public async Task<bool> UpdateNCAsync(Guid id, CreateNCRequest request, Guid? userId = null, string? userName = null)
     {
         var nc = await _context.Nonconformities.FindAsync(id);
-        if (nc == null) return false;
+        if (nc == null || nc.IsDeleted) return false;
 
         nc.Title = request.Title;
         nc.Description = request.Description;
@@ -140,13 +149,14 @@ public class QualityService : IQualityService
             nc.Status = (DomainEntities.NCStatus)request.Status.Value;
         nc.UpdatedAt = DateTime.UtcNow;
 
+        await LogAuditAsync("EDIT", "Nonconformity", nc.Id, $"NC '{nc.Title}' editada", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
-    public async Task<bool> UpdateNCStatusAsync(Guid id, SharedModels.NCStatus status, Guid? userId = null)
+    public async Task<bool> UpdateNCStatusAsync(Guid id, SharedModels.NCStatus status, Guid? userId = null, string? userName = null)
     {
         var nc = await _context.Nonconformities.FindAsync(id);
-        if (nc == null) return false;
+        if (nc == null || nc.IsDeleted) return false;
 
         nc.Status = (DomainEntities.NCStatus)status;
         nc.UpdatedAt = DateTime.UtcNow;
@@ -162,21 +172,38 @@ public class QualityService : IQualityService
             nc.ClosedByUserId = null;
         }
 
+        await LogAuditAsync("STATUS_CHANGE", "Nonconformity", nc.Id, $"NC estado cambiado a {status}", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
-    public async Task<bool> DeleteNCAsync(Guid id)
+    public async Task<bool> DeleteNCAsync(Guid id, Guid? userId = null, string? userName = null)
     {
-        var nc = await _context.Nonconformities.FindAsync(id);
-        if (nc == null) return false;
+        var nc = await _context.Nonconformities
+            .Include(n => n.Actions)
+            .FirstOrDefaultAsync(n => n.Id == id);
+            
+        if (nc == null || nc.IsDeleted) return false;
 
-        _context.Nonconformities.Remove(nc);
+        // Soft delete NC
+        nc.IsDeleted = true;
+        nc.DeletedAt = DateTime.UtcNow;
+        nc.DeletedByUserId = userId;
+
+        // Soft delete associated CAPA actions
+        foreach (var action in nc.Actions)
+        {
+            action.IsDeleted = true;
+            action.DeletedAt = DateTime.UtcNow;
+            action.DeletedByUserId = userId;
+        }
+
+        await LogAuditAsync("SOFT_DELETE", "Nonconformity", nc.Id, $"NC '{nc.Title}' eliminada lógicamente (conservación de evidencia histórica - ISO 15189 §8.7)", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
     // ── CAPA Actions ─────────────────────────────────────────────────
 
-    public async Task<Guid> CreateCAPAAsync(CreateCAPARequest request)
+    public async Task<Guid> CreateCAPAAsync(CreateCAPARequest request, Guid? userId = null, string? userName = null)
     {
         var capa = new DomainEntities.CapaAction
         {
@@ -191,37 +218,75 @@ public class QualityService : IQualityService
 
         _context.CapaActions.Add(capa);
         await _context.SaveChangesAsync();
+
+        await LogAuditAsync("CREATE", "CapaAction", capa.Id, $"Acción CAPA creada para NC {request.NCId}", userId, userName);
+        await _context.SaveChangesAsync();
+
         return capa.Id;
     }
 
-    public async Task<bool> UpdateCAPAStatusAsync(Guid id, SharedModels.CAPAStatus status)
+    public async Task<bool> UpdateCAPAStatusAsync(Guid id, SharedModels.CAPAStatus status, Guid? userId = null, string? userName = null)
     {
         var capa = await _context.CapaActions.FindAsync(id);
-        if (capa == null) return false;
+        if (capa == null || capa.IsDeleted) return false;
 
         capa.Status = (DomainEntities.CAPAStatus)status;
+        await LogAuditAsync("STATUS_CHANGE", "CapaAction", capa.Id, $"Acción CAPA estado cambiado a {status}", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
-    public async Task<bool> CompleteCAPAAsync(Guid id, string? effectivenessCheck, Guid? userId = null)
+    public async Task<bool> CompleteCAPAAsync(Guid id, string? effectivenessCheck, Guid? userId = null, string? userName = null)
     {
         var capa = await _context.CapaActions.FindAsync(id);
-        if (capa == null) return false;
+        if (capa == null || capa.IsDeleted) return false;
+
+        // ISO 15189 §8.7.2 - Validación fuerte de eficacia
+        if (string.IsNullOrWhiteSpace(effectivenessCheck))
+        {
+            throw new InvalidOperationException("Debe ingresar la verificación de la eficacia para completar la acción CAPA (ISO 15189 §8.7.2).");
+        }
 
         capa.Status = DomainEntities.CAPAStatus.DONE;
         capa.CompletedAt = DateTime.UtcNow;
         capa.EffectivenessCheck = effectivenessCheck;
         capa.ClosedByUserId = userId;
 
+        await LogAuditAsync("COMPLETE", "CapaAction", capa.Id, "Acción CAPA completada con verificación de eficacia", userId, userName);
+
+        // Reglas de cierre automático de NC:
+        // Si todas las CAPA no eliminadas de la NC asociada están DONE o VERIFIED, y la NC está en ACTION, cerrarla.
+        if (capa.NCId.HasValue)
+        {
+            var nc = await _context.Nonconformities.Include(n => n.Actions).FirstOrDefaultAsync(n => n.Id == capa.NCId.Value && !n.IsDeleted);
+            if (nc != null)
+            {
+                var activeCapas = nc.Actions.Where(a => !a.IsDeleted && a.Status != DomainEntities.CAPAStatus.CANCELLED);
+                if (activeCapas.All(a => a.Status == DomainEntities.CAPAStatus.DONE || a.Status == DomainEntities.CAPAStatus.VERIFIED))
+                {
+                    if (nc.Status == DomainEntities.NCStatus.ACTION)
+                    {
+                        nc.Status = DomainEntities.NCStatus.CLOSED;
+                        nc.ClosedAt = DateTime.UtcNow;
+                        nc.ClosedByUserId = userId;
+                        await LogAuditAsync("STATUS_CHANGE", "Nonconformity", nc.Id, "NC cerrada automáticamente al completar todas sus acciones CAPA con éxito (ISO 15189 §8.7.2)", userId, userName);
+                    }
+                }
+            }
+        }
+
         return await _context.SaveChangesAsync() > 0;
     }
 
-    public async Task<bool> DeleteCAPAAsync(Guid id)
+    public async Task<bool> DeleteCAPAAsync(Guid id, Guid? userId = null, string? userName = null)
     {
         var capa = await _context.CapaActions.FindAsync(id);
-        if (capa == null) return false;
+        if (capa == null || capa.IsDeleted) return false;
 
-        _context.CapaActions.Remove(capa);
+        capa.IsDeleted = true;
+        capa.DeletedAt = DateTime.UtcNow;
+        capa.DeletedByUserId = userId;
+
+        await LogAuditAsync("SOFT_DELETE", "CapaAction", capa.Id, "Acción CAPA eliminada lógicamente (conservación de evidencia histórica - ISO 15189 §8.7)", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
@@ -230,6 +295,7 @@ public class QualityService : IQualityService
     public async Task<List<ComplaintListDto>> GetComplaintsAsync()
     {
         return await _context.Complaints
+            .Where(c => !c.IsDeleted)
             .OrderByDescending(c => c.Date)
             .Select(c => new ComplaintListDto
             {
@@ -247,7 +313,7 @@ public class QualityService : IQualityService
     {
         var c = await _context.Complaints
             .Include(x => x.Actions)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
         if (c == null) return null;
 
@@ -295,7 +361,7 @@ public class QualityService : IQualityService
         };
     }
 
-    public async Task<Guid> CreateComplaintAsync(CreateComplaintRequest request)
+    public async Task<Guid> CreateComplaintAsync(CreateComplaintRequest request, Guid? userId = null, string? userName = null)
     {
         var complaint = new DomainEntities.Complaint
         {
@@ -311,13 +377,17 @@ public class QualityService : IQualityService
 
         _context.Complaints.Add(complaint);
         await _context.SaveChangesAsync();
+
+        await LogAuditAsync("CREATE", "Complaint", complaint.Id, $"Queja registrada de '{complaint.Source}'", userId, userName);
+        await _context.SaveChangesAsync();
+
         return complaint.Id;
     }
 
-    public async Task<bool> UpdateComplaintAsync(Guid id, CreateComplaintRequest request)
+    public async Task<bool> UpdateComplaintAsync(Guid id, CreateComplaintRequest request, Guid? userId = null, string? userName = null)
     {
         var complaint = await _context.Complaints.FindAsync(id);
-        if (complaint == null) return false;
+        if (complaint == null || complaint.IsDeleted) return false;
 
         complaint.Source = request.Source;
         complaint.Description = request.Description;
@@ -325,13 +395,14 @@ public class QualityService : IQualityService
         complaint.InvestigationResult = request.InvestigationResult;
         complaint.CorrectiveAction = request.CorrectiveAction;
 
+        await LogAuditAsync("EDIT", "Complaint", complaint.Id, $"Queja de '{complaint.Source}' editada", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
-    public async Task<bool> UpdateComplaintStatusAsync(Guid id, SharedModels.ComplaintStatus status, Guid? userId = null)
+    public async Task<bool> UpdateComplaintStatusAsync(Guid id, SharedModels.ComplaintStatus status, Guid? userId = null, string? userName = null)
     {
         var complaint = await _context.Complaints.FindAsync(id);
-        if (complaint == null) return false;
+        if (complaint == null || complaint.IsDeleted) return false;
 
         complaint.Status = (DomainEntities.ComplaintStatus)status;
         if (status == SharedModels.ComplaintStatus.CLOSED)
@@ -345,15 +416,40 @@ public class QualityService : IQualityService
             complaint.ClosedByUserId = null;
         }
 
+        await LogAuditAsync("STATUS_CHANGE", "Complaint", complaint.Id, $"Queja estado cambiado a {status}", userId, userName);
         return await _context.SaveChangesAsync() > 0;
     }
 
-    public async Task<bool> DeleteComplaintAsync(Guid id)
+    public async Task<bool> DeleteComplaintAsync(Guid id, Guid? userId = null, string? userName = null)
     {
         var complaint = await _context.Complaints.FindAsync(id);
-        if (complaint == null) return false;
+        if (complaint == null || complaint.IsDeleted) return false;
 
-        _context.Complaints.Remove(complaint);
+        complaint.IsDeleted = true;
+        complaint.DeletedAt = DateTime.UtcNow;
+        complaint.DeletedByUserId = userId;
+
+        await LogAuditAsync("SOFT_DELETE", "Complaint", complaint.Id, $"Queja de '{complaint.Source}' eliminada lógicamente (conservación de evidencia histórica - ISO 15189 §8.7)", userId, userName);
         return await _context.SaveChangesAsync() > 0;
+    }
+
+    // ── Audit Logging Helper ──────────────────────────────────────────
+
+    private async Task LogAuditAsync(string action, string entityType, Guid? entityId, string details, Guid? userId, string? username)
+    {
+        var audit = new DomainEntities.AuditLog
+        {
+            Id = Guid.NewGuid(),
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            Details = details,
+            UserId = userId ?? Guid.Empty,
+            UserName = username ?? "Sistema",
+            Timestamp = DateTime.UtcNow,
+            MachineName = Environment.MachineName,
+            Result = "Success"
+        };
+        _context.AuditLogs.Add(audit);
     }
 }

@@ -1,0 +1,49 @@
+using System;
+
+namespace QMSFlowDoc.Shared.Models;
+
+public enum QCType
+{
+    DIARIO,
+    SEMANAL,
+    MENSUAL,
+    TRAS_MANTENIMIENTO,
+    TRAS_REPARACION,
+    TRAS_CAMBIO_CONFIGURACION,
+    EXTRAORDINARIO
+}
+
+public enum QCOutcome
+{
+    CONFORME,
+    NO_CONFORME,
+    CONFORME_CON_OBSERVACIONES
+}
+
+public class EquipmentFunctionalQC
+{
+    public Guid Id { get; set; }
+    public Guid EquipmentId { get; set; }
+    
+    // Traceability
+    public DateTime PerformedAt { get; set; }
+    public Guid PerformedByUserId { get; set; }
+    public string PerformedByUserName { get; set; } = string.Empty;
+    
+    // QC Details
+    public QCType Type { get; set; } = QCType.DIARIO;
+    public string? LotNumber { get; set; }
+    public string? ParametersEvaluated { get; set; }
+    public string? AcceptanceCriteria { get; set; }
+    public string? ObtainedValues { get; set; }
+    public QCOutcome Outcome { get; set; } = QCOutcome.CONFORME;
+    public bool IsPass { get; set; } = true;
+    
+    public string? EvidencePath { get; set; }
+    public string? Notes { get; set; }
+    public string? ActionTaken { get; set; }
+    public EquipmentStatus EquipmentEndStatus { get; set; } = EquipmentStatus.IN_SERVICE;
+
+    // Navigation property
+    public Equipment? Equipment { get; set; }
+}

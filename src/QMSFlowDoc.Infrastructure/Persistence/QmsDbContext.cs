@@ -22,7 +22,17 @@ namespace QMSFlowDoc.Infrastructure.Persistence
         public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
         public DbSet<MaintenanceEvent> MaintenanceEvents => Set<MaintenanceEvent>();
         public DbSet<EquipmentHistory> EquipmentHistory => Set<EquipmentHistory>();
-        public DbSet<EquipmentDailyQC> EquipmentDailyQC => Set<EquipmentDailyQC>();
+        public DbSet<EquipmentFunctionalQC> EquipmentFunctionalQC => Set<EquipmentFunctionalQC>();
+        public DbSet<EquipmentAcceptance> EquipmentAcceptances => Set<EquipmentAcceptance>();
+        public DbSet<EquipmentCalibrationPlan> EquipmentCalibrationPlans => Set<EquipmentCalibrationPlan>();
+        public DbSet<EquipmentCalibrationRecord> EquipmentCalibrationRecords => Set<EquipmentCalibrationRecord>();
+        public DbSet<EquipmentRepairRecord> EquipmentRepairRecords => Set<EquipmentRepairRecord>();
+        public DbSet<EquipmentIncident> EquipmentIncidents => Set<EquipmentIncident>();
+        public DbSet<EquipmentImpactAssessment> EquipmentImpactAssessments => Set<EquipmentImpactAssessment>();
+        public DbSet<EquipmentDecommission> EquipmentDecommissions => Set<EquipmentDecommission>();
+        public DbSet<EquipmentAlert> EquipmentAlerts => Set<EquipmentAlert>();
+        public DbSet<EquipmentStatusHistory> EquipmentStatusHistories => Set<EquipmentStatusHistory>();
+        public DbSet<EquipmentIndicatorSnapshot> EquipmentIndicatorSnapshots => Set<EquipmentIndicatorSnapshot>();
 
         // ── Inventory & Suppliers ──
         public DbSet<Reagent> Reagents => Set<Reagent>();
@@ -181,7 +191,7 @@ namespace QMSFlowDoc.Infrastructure.Persistence
 
                 e.HasMany(eq => eq.MaintenancePlans).WithOne().HasForeignKey(p => p.EquipmentId);
                 e.HasMany(eq => eq.MaintenanceEvents).WithOne().HasForeignKey(ev => ev.EquipmentId);
-                e.HasMany(eq => eq.DailyQCs).WithOne(qc => qc.Equipment!).HasForeignKey(qc => qc.EquipmentId);
+                e.HasMany(eq => eq.FunctionalQCs).WithOne(qc => qc.Equipment!).HasForeignKey(qc => qc.EquipmentId);
             });
 
             modelBuilder.Entity<MaintenancePlan>(e =>
@@ -211,12 +221,116 @@ namespace QMSFlowDoc.Infrastructure.Persistence
                 e.HasIndex(h => h.EquipmentId);
             });
 
-            modelBuilder.Entity<EquipmentDailyQC>(e =>
+            modelBuilder.Entity<EquipmentFunctionalQC>(e =>
             {
-                e.ToTable("EquipmentDailyQC");
+                e.ToTable("EquipmentFunctionalQC");
                 e.HasKey(qc => qc.Id);
                 e.Property(qc => qc.LotNumber).HasMaxLength(100);
                 e.HasIndex(qc => new { qc.EquipmentId, qc.PerformedAt });
+                e.Property(qc => qc.Type).HasConversion<int>();
+                e.Property(qc => qc.Outcome).HasConversion<int>();
+            });
+
+            modelBuilder.Entity<EquipmentAcceptance>(e =>
+            {
+                e.ToTable("EquipmentAcceptances");
+                e.HasKey(a => a.Id);
+                e.HasOne(a => a.Equipment).WithOne().HasForeignKey<EquipmentAcceptance>(a => a.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(a => a.ReceptionCondition).HasMaxLength(50);
+                e.Property(a => a.CriteriaMet).HasMaxLength(50);
+                e.Property(a => a.AcceptanceOutcome).HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<EquipmentCalibrationPlan>(e =>
+            {
+                e.ToTable("EquipmentCalibrationPlans");
+                e.HasKey(p => p.Id);
+                e.HasOne(p => p.Equipment).WithMany().HasForeignKey(p => p.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(p => p.ControlledMagnitude).HasMaxLength(150);
+                e.Property(p => p.Tolerance).HasMaxLength(150);
+                e.Property(p => p.ProviderOrMethod).HasMaxLength(300);
+            });
+
+            modelBuilder.Entity<EquipmentCalibrationRecord>(e =>
+            {
+                e.ToTable("EquipmentCalibrationRecords");
+                e.HasKey(r => r.Id);
+                e.HasOne(r => r.Equipment).WithMany().HasForeignKey(r => r.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(r => r.Outcome).HasConversion<int>();
+                e.Property(r => r.Type).HasMaxLength(100);
+                e.Property(r => r.Magnitude).HasMaxLength(150);
+                e.Property(r => r.ObservedError).HasMaxLength(150);
+                e.Property(r => r.MaxPermissibleError).HasMaxLength(150);
+                e.Property(r => r.Uncertainty).HasMaxLength(150);
+                e.Property(r => r.VolumeNominal).HasColumnType("decimal(18,4)");
+                e.Property(r => r.VolumeTested).HasColumnType("decimal(18,4)");
+                e.Property(r => r.SystematicError).HasColumnType("decimal(18,4)");
+                e.Property(r => r.RandomError).HasColumnType("decimal(18,4)");
+                e.Property(r => r.AcceptableLimit).HasColumnType("decimal(18,4)");
+            });
+
+            modelBuilder.Entity<EquipmentRepairRecord>(e =>
+            {
+                e.ToTable("EquipmentRepairRecords");
+                e.HasKey(r => r.Id);
+                e.HasOne(r => r.Equipment).WithMany().HasForeignKey(r => r.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(r => r.DetectedDuring).HasMaxLength(150);
+                e.Property(r => r.Severity).HasMaxLength(50);
+                e.Property(r => r.Outcome).HasMaxLength(50);
+                e.Property(r => r.PerformedBy).HasMaxLength(300);
+            });
+
+            modelBuilder.Entity<EquipmentIncident>(e =>
+            {
+                e.ToTable("EquipmentIncidents");
+                e.HasKey(i => i.Id);
+                e.HasOne(i => i.Equipment).WithMany().HasForeignKey(i => i.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(i => i.IncidentType).HasMaxLength(150);
+                e.Property(i => i.Severity).HasMaxLength(50);
+                e.Property(i => i.IncidentStatus).HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<EquipmentImpactAssessment>(e =>
+            {
+                e.ToTable("EquipmentImpactAssessments");
+                e.HasKey(a => a.Id);
+                e.HasOne(a => a.Equipment).WithMany().HasForeignKey(a => a.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(a => a.ImpactType).HasMaxLength(150);
+                e.Property(a => a.Decision).HasMaxLength(150);
+            });
+
+            modelBuilder.Entity<EquipmentDecommission>(e =>
+            {
+                e.ToTable("EquipmentDecommissions");
+                e.HasKey(d => d.Id);
+                e.HasOne(d => d.Equipment).WithMany().HasForeignKey(d => d.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(d => d.Type).HasMaxLength(50);
+                e.Property(d => d.Destination).HasMaxLength(150);
+            });
+
+            modelBuilder.Entity<EquipmentAlert>(e =>
+            {
+                e.ToTable("EquipmentAlerts");
+                e.HasKey(a => a.Id);
+                e.HasOne(a => a.Equipment).WithMany().HasForeignKey(a => a.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(a => a.Type).HasMaxLength(100);
+                e.Property(a => a.Severity).HasMaxLength(30);
+            });
+
+            modelBuilder.Entity<EquipmentStatusHistory>(e =>
+            {
+                e.ToTable("EquipmentStatusHistories");
+                e.HasKey(h => h.Id);
+                e.HasOne(h => h.Equipment).WithMany().HasForeignKey(h => h.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(h => h.OldStatus).HasConversion<int>();
+                e.Property(h => h.NewStatus).HasConversion<int>();
+            });
+
+            modelBuilder.Entity<EquipmentIndicatorSnapshot>(e =>
+            {
+                e.ToTable("EquipmentIndicatorSnapshots");
+                e.HasKey(s => s.Id);
+                e.Property(s => s.IndicatorKey).HasMaxLength(100);
             });
 
             // ── Inventory & Suppliers ──

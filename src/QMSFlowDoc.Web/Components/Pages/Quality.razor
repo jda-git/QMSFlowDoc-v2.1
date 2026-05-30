@@ -692,6 +692,39 @@ else
     </div>
 }
 
+<!-- ============ Verify CAPA Effectiveness Modal ============ -->
+@if (showEffectivenessModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-gradient-dark text-white rounded-top-4 py-3 px-4" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-patch-check-fill me-2"></i>Verificación de la Eficacia CAPA</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showEffectivenessModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Eficacia de la Acción (ISO 15189 §8.7.2) <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-premium" @bind="effectivenessText" rows="3" placeholder="Describa la evidencia de que la acción ha sido eficaz y previene la recurrencia..."></textarea>
+                    </div>
+                    @if (string.IsNullOrWhiteSpace(effectivenessText))
+                    {
+                        <div class="alert alert-warning py-2 rounded-3 small">
+                            <i class="bi bi-info-circle-fill me-2"></i>La verificación de la eficacia es obligatoria según la norma ISO 15189.
+                        </div>
+                    }
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="button" class="btn btn-light" @onclick="() => showEffectivenessModal = false">Cancelar</button>
+                        <button type="button" class="btn btn-primary px-4 text-white" disabled="@(string.IsNullOrWhiteSpace(effectivenessText))" @onclick="SaveCAPAEffectiveness">
+                            <i class="bi bi-check-lg me-1"></i>Completar Acción
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- ============ Create/Edit Complaint Modal ============ -->
 @if (showComplaintModal)
 {
@@ -811,6 +844,9 @@ else
     private bool showCAPAModal = false;
     private bool showComplaintModal = false;
     private bool showDeleteConfirm = false;
+    private bool showEffectivenessModal = false;
+    private string effectivenessText = "";
+    private Guid completingCapaId;
     private bool isEditingNC = false;
     private Guid? editingNCId;
     private bool isEditingComplaint = false;
@@ -834,6 +870,7 @@ else
     [CascadingParameter]
     private Task<AuthenticationState>? AuthStateTask { get; set; }
     private Guid? currentUserId;
+    private string? currentUserName;
 
     protected override async Task OnInitializedAsync()
     {
@@ -841,6 +878,7 @@ else
         {
             var authState = await AuthStateTask;
             var user = authState.User;
+            currentUserName = user.Identity?.Name;
             var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
             if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var uId))
                 currentUserId = uId;
@@ -923,9 +961,9 @@ else
         );
 
         if (isEditingNC && editingNCId.HasValue)
-            await QualityService.UpdateNCAsync(editingNCId.Value, req);
+            await QualityService.UpdateNCAsync(editingNCId.Value, req, currentUserId, currentUserName);
         else
-            await QualityService.CreateNCAsync(req);
+            await QualityService.CreateNCAsync(req, currentUserId, currentUserName);
 
         showNCModal = false;
         await LoadData();
@@ -934,7 +972,7 @@ else
     private async Task ChangeNCStatus(NCStatus status)
     {
         if (selectedNC == null) return;
-        await QualityService.UpdateNCStatusAsync(selectedNC.Id, status, currentUserId);
+        await QualityService.UpdateNCStatusAsync(selectedNC.Id, status, currentUserId, currentUserName);
         selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
         await LoadData();
     }
@@ -944,7 +982,7 @@ else
         deleteConfirmMessage = $"¿Está seguro de eliminar la NC '{nc.Title}'? Esta acción es irreversible.";
         deleteAction = async () =>
         {
-            await QualityService.DeleteNCAsync(nc.Id);
+            await QualityService.DeleteNCAsync(nc.Id, currentUserId, currentUserName);
             if (selectedNC?.Id == nc.Id) selectedNC = null;
             await LoadData();
         };
@@ -967,22 +1005,32 @@ else
             selectedNC.Id, at, capaModel.Description,
             currentUserId, capaModel.DueDate
         );
-        await QualityService.CreateCAPAAsync(req);
+        await QualityService.CreateCAPAAsync(req, currentUserId, currentUserName);
         showCAPAModal = false;
         selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
         await LoadData();
     }
 
-    private async Task CompleteCAPAAction(Guid capaId)
+    private void CompleteCAPAAction(Guid capaId)
     {
-        await QualityService.CompleteCAPAAsync(capaId, null, currentUserId);
+        completingCapaId = capaId;
+        effectivenessText = "";
+        showEffectivenessModal = true;
+    }
+
+    private async Task SaveCAPAEffectiveness()
+    {
+        if (string.IsNullOrWhiteSpace(effectivenessText)) return;
+
+        await QualityService.CompleteCAPAAsync(completingCapaId, effectivenessText, currentUserId, currentUserName);
+        showEffectivenessModal = false;
         if (selectedNC != null) selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
         await LoadData();
     }
 
     private async Task DeleteCAPAAction(Guid capaId)
     {
-        await QualityService.DeleteCAPAAsync(capaId);
+        await QualityService.DeleteCAPAAsync(capaId, currentUserId, currentUserName);
         if (selectedNC != null) selectedNC = await QualityService.GetNCByIdAsync(selectedNC.Id);
         await LoadData();
     }
@@ -1040,11 +1088,11 @@ else
         );
         if (isEditingComplaint && editingComplaintId.HasValue)
         {
-            await QualityService.UpdateComplaintAsync(editingComplaintId.Value, req);
+            await QualityService.UpdateComplaintAsync(editingComplaintId.Value, req, currentUserId, currentUserName);
         }
         else
         {
-            await QualityService.CreateComplaintAsync(req);
+            await QualityService.CreateComplaintAsync(req, currentUserId, currentUserName);
         }
         showComplaintModal = false;
         await LoadData();
@@ -1053,7 +1101,7 @@ else
     private async Task ChangeComplaintStatus(ComplaintStatus status)
     {
         if (selectedComplaint == null) return;
-        await QualityService.UpdateComplaintStatusAsync(selectedComplaint.Id, status, currentUserId);
+        await QualityService.UpdateComplaintStatusAsync(selectedComplaint.Id, status, currentUserId, currentUserName);
         selectedComplaint = await QualityService.GetComplaintByIdAsync(selectedComplaint.Id);
         await LoadData();
     }
@@ -1063,7 +1111,7 @@ else
         deleteConfirmMessage = $"¿Está seguro de eliminar la queja de '{c.Source}'? Esta acción es irreversible.";
         deleteAction = async () =>
         {
-            await QualityService.DeleteComplaintAsync(c.Id);
+            await QualityService.DeleteComplaintAsync(c.Id, currentUserId, currentUserName);
             if (selectedComplaint?.Id == c.Id) selectedComplaint = null;
             await LoadData();
         };

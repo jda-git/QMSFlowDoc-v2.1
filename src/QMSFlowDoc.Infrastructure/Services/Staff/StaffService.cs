@@ -109,7 +109,7 @@ public class StaffService : IStaffService
                 ValidUntil = ev.ValidUntil,
                 Outcome = ev.Outcome,
                 Evidence = ev.Findings,
-                EvaluatorName = evaluatorNames.TryGetValue(ev.EvaluatorStaffId, out var evalName) ? evalName : "Evaluador"
+                EvaluatorName = (ev.EvaluatorStaffId.HasValue && evaluatorNames.TryGetValue(ev.EvaluatorStaffId.Value, out var evalName)) ? evalName : "Evaluador"
             }).ToList();
 
         var statuses = staff.CompetencyStatuses
@@ -134,7 +134,7 @@ public class StaffService : IStaffService
                 a.ValidUntil,
                 a.GrantedAt,
                 a.Status,
-                systemUserNames.TryGetValue(a.GrantedByUserId, out var granterName) ? granterName : "Responsable"
+                systemUserNames.TryGetValue(a.GrantedByUserId ?? Guid.Empty, out var granterName) ? granterName : "Responsable"
             )).ToList();
 
         return new StaffExpedienteDto(
@@ -199,7 +199,7 @@ public class StaffService : IStaffService
                           a.Id,
                           a.Title,
                           a.Provider,
-                          a.TrainingTypeId,
+                          a.TrainingTypeId ?? Guid.Empty,
                           a.TrainingType!.Name,
                           a.Modality,
                           a.StartDate,
@@ -223,7 +223,7 @@ public class StaffService : IStaffService
             Id = Guid.NewGuid(),
             Title = request.Title,
             Provider = request.Provider,
-            TrainingTypeId = request.TrainingTypeId ?? Guid.Empty,
+            TrainingTypeId = request.TrainingTypeId,
             Modality = request.Modality ?? "PRESENCIAL",
             StartDate = request.StartDate,
             EndDate = request.EndDate,
@@ -233,7 +233,7 @@ public class StaffService : IStaffService
             IsInternal = request.IsInternal,
             InternalDepartment = null,
             Status = "ACTIVO",
-            CreatedByUserId = request.CreatedByUserId ?? Guid.Empty
+            CreatedByUserId = request.CreatedByUserId
         };
 
         _context.TrainingActivities.Add(act);
@@ -297,7 +297,7 @@ public class StaffService : IStaffService
             StaffId = request.StaffId,
             CompetencyId = competency.Id,
             EvaluationDate = request.EvaluationDate,
-            EvaluatorStaffId = request.AssessedByUserId ?? Guid.Empty,
+            EvaluatorStaffId = request.AssessedByUserId,
             Outcome = request.Outcome.ToString(),
             ValidUntil = validUntil,
             NextDueDate = validUntil,
@@ -364,7 +364,7 @@ public class StaffService : IStaffService
             Id = Guid.NewGuid(),
             StaffId = request.StaffId,
             AuthorizationId = authCatalog.Id,
-            GrantedByUserId = request.GrantedByUserId ?? Guid.Empty,
+            GrantedByUserId = request.GrantedByUserId,
             GrantedAt = DateTime.UtcNow,
             ValidFrom = request.ValidFrom,
             ValidUntil = request.ValidUntil,
@@ -397,7 +397,7 @@ public class StaffService : IStaffService
             DefaultReassessmentMonths = request.DefaultReassessmentMonths,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
-            CreatedByUserId = request.CreatedByUserId ?? Guid.Empty
+            CreatedByUserId = request.CreatedByUserId
         };
 
         _context.CompetencyCatalogs.Add(comp);
@@ -447,7 +447,7 @@ public class StaffService : IStaffService
             ValidityMonths = request.ValidityMonths,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
-            CreatedByUserId = request.CreatedByUserId ?? Guid.Empty,
+            CreatedByUserId = request.CreatedByUserId,
             AssessmentMethod = request.AssessmentMethod
         };
 

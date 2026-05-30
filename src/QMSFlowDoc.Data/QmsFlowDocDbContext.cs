@@ -29,7 +29,7 @@ public class QmsFlowDocDbContext : DbContext
     public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
     public DbSet<MaintenanceEvent> MaintenanceEvents => Set<MaintenanceEvent>();
     public DbSet<EquipmentHistory> EquipmentHistory => Set<EquipmentHistory>();
-    public DbSet<EquipmentDailyQC> EquipmentDailyQC => Set<EquipmentDailyQC>();
+    public DbSet<EquipmentFunctionalQC> EquipmentFunctionalQC => Set<EquipmentFunctionalQC>();
 
     // ── Inventory & Suppliers ──
     public DbSet<Reagent> Reagents => Set<Reagent>();
@@ -208,7 +208,7 @@ public class QmsFlowDocDbContext : DbContext
 
             e.HasMany(eq => eq.MaintenancePlans).WithOne().HasForeignKey(p => p.EquipmentId);
             e.HasMany(eq => eq.MaintenanceEvents).WithOne().HasForeignKey(ev => ev.EquipmentId);
-            e.HasMany(eq => eq.DailyQCs).WithOne(qc => qc.Equipment!).HasForeignKey(qc => qc.EquipmentId);
+            e.HasMany(eq => eq.FunctionalQCs).WithOne(qc => qc.Equipment!).HasForeignKey(qc => qc.EquipmentId);
         });
 
         modelBuilder.Entity<MaintenancePlan>(e =>
@@ -238,9 +238,9 @@ public class QmsFlowDocDbContext : DbContext
             e.HasIndex(h => h.EquipmentId);
         });
 
-        modelBuilder.Entity<EquipmentDailyQC>(e =>
+        modelBuilder.Entity<EquipmentFunctionalQC>(e =>
         {
-            e.ToTable("EquipmentDailyQC");
+            e.ToTable("EquipmentDailyQC"); // Map to same table to keep local DB compatibility
             e.HasKey(qc => qc.Id);
             e.Property(qc => qc.LotNumber).HasMaxLength(100);
             e.HasIndex(qc => new { qc.EquipmentId, qc.PerformedAt });

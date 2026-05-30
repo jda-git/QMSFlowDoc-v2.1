@@ -61,7 +61,7 @@ public class EquipmentService : IEquipmentService
         return await ctx.Equipments
             .Include(e => e.MaintenancePlans)
             .Include(e => e.MaintenanceEvents.OrderByDescending(ev => ev.PerformedAt))
-            .Include(e => e.DailyQCs.OrderByDescending(qc => qc.PerformedAt).Take(30))
+            .Include(e => e.FunctionalQCs.OrderByDescending(qc => qc.PerformedAt).Take(30))
             .FirstOrDefaultAsync(e => e.Id == id);
     }
 
@@ -171,7 +171,7 @@ public class EquipmentService : IEquipmentService
     public async Task<bool> RegisterDailyQCAsync(CreateDailyQCRequest request)
     {
         using var ctx = _dbFactory.CreateContext();
-        var qc = new EquipmentDailyQC
+        var qc = new EquipmentFunctionalQC
         {
             Id = Guid.NewGuid(),
             EquipmentId = request.EquipmentId,
@@ -181,7 +181,7 @@ public class EquipmentService : IEquipmentService
             LotNumber = request.LotNumber,
             IsPass = request.IsPass
         };
-        ctx.EquipmentDailyQC.Add(qc);
+        ctx.EquipmentFunctionalQC.Add(qc);
         await ctx.SaveChangesAsync();
         return true;
     }
@@ -189,7 +189,7 @@ public class EquipmentService : IEquipmentService
     public async Task<IEnumerable<EquipmentDailyQCDto>> GetDailyQCAsync(Guid equipmentId)
     {
         using var ctx = _dbFactory.CreateContext();
-        return await ctx.EquipmentDailyQC
+        return await ctx.EquipmentFunctionalQC
             .Where(qc => qc.EquipmentId == equipmentId)
             .OrderByDescending(qc => qc.PerformedAt)
             .Take(100)

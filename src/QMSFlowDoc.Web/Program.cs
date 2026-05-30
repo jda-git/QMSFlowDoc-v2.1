@@ -16,11 +16,17 @@ builder.Services.AddDbContext<QmsDbContext>(options =>
 
 // Identity Configuration
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options => {
-    options.Password.RequireDigit = false;
-    options.Password.RequiredLength = 6;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequireLowercase = false;
+    // ISO 15189 §4.2 - Política de contraseñas robusta
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
+
+    // ISO 15189 §7.6 - Bloqueo por intentos fallidos
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
 })
 .AddEntityFrameworkStores<QmsDbContext>()
 .AddDefaultTokenProviders();
@@ -42,6 +48,7 @@ builder.Services.AddScoped<QMSFlowDoc.Application.Services.Staff.IStaffService, 
 builder.Services.AddScoped<QMSFlowDoc.Application.Services.Identity.IUserService, QMSFlowDoc.Infrastructure.Services.Identity.UserService>();
 builder.Services.AddScoped<QMSFlowDoc.Application.Services.Identity.IPermissionService, QMSFlowDoc.Infrastructure.Services.Identity.PermissionService>();
 builder.Services.AddScoped<QMSFlowDoc.Application.Services.Quality.IQualityService, QMSFlowDoc.Infrastructure.Services.Quality.QualityService>();
+builder.Services.AddScoped<QMSFlowDoc.Application.Services.Equipment.IEquipmentService, QMSFlowDoc.Infrastructure.Services.Equipment.EquipmentService>();
 
 builder.Services.ConfigureApplicationCookie(options => {
     options.LoginPath = "/login";
