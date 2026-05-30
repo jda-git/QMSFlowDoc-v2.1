@@ -22,14 +22,39 @@ public interface IStaffService
     // Competency Evaluation & Catalog
     Task<List<CompetencyCatalogDto>> GetCompetencyCatalogAsync();
     Task RecordCompetencyEvaluationAsync(AssessCompetencyRequest request);
+    Task<Guid> CreateCompetencyCatalogAsync(CreateCompetencyCatalogRequest request);
+    Task UpdateCompetencyCatalogAsync(Guid id, CreateCompetencyCatalogRequest request);
+    Task DeleteCompetencyCatalogAsync(Guid id);
     
     // Authorizations
     Task<List<AuthorizationCatalogDto>> GetAuthorizationCatalogAsync();
     Task GrantAuthorizationAsync(GrantAuthorizationRequest request);
+    Task<Guid> CreateAuthorizationCatalogAsync(CreateAuthorizationCatalogRequest request);
+    Task UpdateAuthorizationCatalogAsync(Guid id, CreateAuthorizationCatalogRequest request);
+    Task DeleteAuthorizationCatalogAsync(Guid id);
     
     // Helpers
     Task<List<UserLookupDto>> GetAvailableUsersLookupAsync();
 }
+
+public record CreateCompetencyCatalogRequest(
+    string Code,
+    string Name,
+    string? Description,
+    string RoleScope,
+    string Area,
+    string? SubArea,
+    int DefaultReassessmentMonths
+);
+
+public record CreateAuthorizationCatalogRequest(
+    string Code,
+    string Name,
+    string? Description,
+    string RoleScope,
+    bool RequiresCompetency,
+    int? ValidityMonths
+);
 
 public record StaffExpedienteDto(
     Guid Id,

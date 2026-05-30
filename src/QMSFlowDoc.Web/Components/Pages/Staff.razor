@@ -253,6 +253,9 @@
         {
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted small">@competencyCatalog.Count competencias en catálogo</span>
+                <button class="btn btn-outline-success btn-sm px-3" @onclick="OpenAddCompetencyCatalogModal">
+                    <i class="bi bi-plus-circle me-1"></i> Nueva Competencia
+                </button>
             </div>
 
             <!-- Competency Catalog Table -->
@@ -266,6 +269,7 @@
                             <th>Subárea</th>
                             <th>Ámbito de Rol</th>
                             <th>Vigencia (Meses)</th>
+                            <th class="text-end pe-3">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -278,6 +282,14 @@
                                 <td class="text-muted">@comp.SubArea</td>
                                 <td><span class="badge bg-light text-info border">@comp.RoleScope</span></td>
                                 <td class="text-dark">@comp.DefaultReassessmentMonths meses</td>
+                                <td class="text-end pe-3">
+                                    <button class="btn btn-light btn-sm rounded-3 border px-2.5 me-1" @onclick="() => OpenEditCompetencyCatalogModal(comp)" title="Editar">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm rounded-3 px-2.5" @onclick="() => ConfirmDeleteCompetencyCatalog(comp)" title="Eliminar">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -288,6 +300,9 @@
         {
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted small">@authorizationsCatalog.Count autorizaciones clínicas definidas</span>
+                <button class="btn btn-outline-warning btn-sm text-dark px-3 fw-medium" @onclick="OpenAddAuthorizationCatalogModal">
+                    <i class="bi bi-plus-circle me-1"></i> Nueva Autorización
+                </button>
             </div>
 
             <!-- Authorizations Catalog Table -->
@@ -300,6 +315,7 @@
                             <th>Descripción</th>
                             <th>Requiere Competencia</th>
                             <th>Ámbito de Rol</th>
+                            <th class="text-end pe-3">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -315,6 +331,14 @@
                                     </span>
                                 </td>
                                 <td><span class="badge bg-light text-info border">@auth.RoleScope</span></td>
+                                <td class="text-end pe-3">
+                                    <button class="btn btn-light btn-sm rounded-3 border px-2.5 me-1" @onclick="() => OpenEditAuthorizationCatalogModal(auth)" title="Editar">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm rounded-3 px-2.5" @onclick="() => ConfirmDeleteAuthorizationCatalog(auth)" title="Eliminar">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -539,7 +563,7 @@
                             <div class="col-6">
                                 <label class="form-label fw-medium text-secondary small">Tipo de Formación</label>
                                 <InputSelect class="form-select form-select-premium" @bind-Value="trainingModel.TrainingTypeId">
-                                    <option value="">-- Seleccionar --</option>
+                                    <option value="@Guid.Empty">-- Seleccionar --</option>
                                     @foreach (var type in trainingTypeCatalog)
                                     {
                                         <option value="@type.Id">@type.Name</option>
@@ -608,7 +632,7 @@
                             <div class="col-12">
                                 <label class="form-label fw-medium text-secondary small">Empleado</label>
                                 <InputSelect class="form-select form-select-premium" @bind-Value="assignmentModel.StaffId">
-                                    <option value="">-- Seleccionar --</option>
+                                    <option value="@Guid.Empty">-- Seleccionar --</option>
                                     @foreach (var s in staffList)
                                     {
                                         <option value="@s.Id">@s.FullName</option>
@@ -669,7 +693,7 @@
                             <div class="col-12">
                                 <label class="form-label fw-medium text-secondary small">Competencia a Evaluar</label>
                                 <InputSelect class="form-select form-select-premium" @bind-Value="evaluationModel.CompetencyId">
-                                    <option value="">-- Seleccionar --</option>
+                                    <option value="@Guid.Empty">-- Seleccionar --</option>
                                     @foreach (var c in competencyCatalog)
                                     {
                                         <option value="@c.Id">@c.Code - @c.Name</option>
@@ -679,7 +703,7 @@
                             <div class="col-12">
                                 <label class="form-label fw-medium text-secondary small">Evaluador</label>
                                 <InputSelect class="form-select form-select-premium" @bind-Value="evaluationModel.EvaluatorStaffId">
-                                    <option value="">-- Seleccionar Evaluador --</option>
+                                    <option value="@Guid.Empty">-- Seleccionar Evaluador --</option>
                                     @foreach (var s in staffList)
                                     {
                                         <option value="@s.Id">@s.FullName</option>
@@ -733,7 +757,7 @@
                             <div class="col-12">
                                 <label class="form-label fw-medium text-secondary small">Autorización / Procedimiento</label>
                                 <InputSelect class="form-select form-select-premium" @bind-Value="grantModel.AuthorizationId">
-                                    <option value="">-- Seleccionar --</option>
+                                    <option value="@Guid.Empty">-- Seleccionar --</option>
                                     @foreach (var a in authorizationsCatalog)
                                     {
                                         <option value="@a.Id">@a.Code - @a.Name</option>
@@ -755,6 +779,171 @@
                             <button type="submit" class="btn btn-warning text-dark px-4 fw-medium">Conceder Autorización</button>
                         </div>
                     </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: CREAR/EDITAR COMPETENCIA EN EL CATÁLOGO -->
+@if (showCompetencyCatalogModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content card shadow border-0 rounded-4 w-100">
+                <div class="card-header bg-success text-white py-3 border-0 rounded-top-4 d-flex justify-content-between">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-shield-plus me-2"></i>@(isEditingCompetencyCatalog ? "Editar Competencia" : "Nueva Competencia en Catálogo")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showCompetencyCatalogModal = false"></button>
+                </div>
+                <div class="card-body p-4">
+                    <EditForm Model="competencyCatalogModel" OnValidSubmit="SaveCompetencyCatalog">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Código</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="competencyCatalogModel.Code" placeholder="Ej. COMP-HEM-01" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Ámbito de Rol</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="competencyCatalogModel.RoleScope">
+                                    <option value="Técnico">Técnico</option>
+                                    <option value="Facultativo">Facultativo</option>
+                                    <option value="AMBOS">Ambos / General</option>
+                                    <option value="Staff">Todo el Personal</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Nombre de la Competencia</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="competencyCatalogModel.Name" placeholder="Ej. Frotis de sangre periférica" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Área</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="competencyCatalogModel.Area" placeholder="Ej. Hematología" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Subárea (opcional)</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="competencyCatalogModel.SubArea" placeholder="Ej. Citología" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Reevaluación (Meses)</label>
+                                <InputNumber class="form-control form-control-premium" @bind-Value="competencyCatalogModel.DefaultReassessmentMonths" min="1" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Descripción (opcional)</label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="competencyCatalogModel.Description" placeholder="Detalle qué conocimientos o habilidades evalúa esta competencia..." rows="2" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showCompetencyCatalogModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-success px-4 fw-medium text-white">Guardar Competencia</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: CREAR/EDITAR AUTORIZACIÓN EN EL CATÁLOGO -->
+@if (showAuthorizationCatalogModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content card shadow border-0 rounded-4 w-100">
+                <div class="card-header bg-warning text-dark py-3 border-0 rounded-top-4 d-flex justify-content-between">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-key me-2"></i>@(isEditingAuthorizationCatalog ? "Editar Autorización" : "Nueva Autorización en Catálogo")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="() => showAuthorizationCatalogModal = false"></button>
+                </div>
+                <div class="card-body p-4">
+                    <EditForm Model="authorizationCatalogModel" OnValidSubmit="SaveAuthorizationCatalog">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Código</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="authorizationCatalogModel.Code" placeholder="Ej. AUTH-RESULT-HEM" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Ámbito de Rol</label>
+                                <InputSelect class="form-select form-select-premium" @bind-Value="authorizationCatalogModel.RoleScope">
+                                    <option value="Técnico">Técnico</option>
+                                    <option value="Facultativo">Facultativo</option>
+                                    <option value="AMBOS">Ambos / General</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Nombre de la Autorización</label>
+                                <InputText class="form-control form-control-premium" @bind-Value="authorizationCatalogModel.Name" placeholder="Ej. Validación facultativa de Hemogramas" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium text-secondary small">Vigencia (Meses, opcional)</label>
+                                <InputNumber class="form-control form-control-premium" @bind-Value="authorizationCatalogModel.ValidityMonths" min="1" placeholder="Ej. 12" />
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch pt-2">
+                                    <InputCheckbox class="form-check-input" id="authRequiresCompetency" @bind-Value="authorizationCatalogModel.RequiresCompetency" />
+                                    <label class="form-check-label text-muted small" for="authRequiresCompetency">¿Requiere competencia previa aprobada?</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-medium text-secondary small">Descripción (opcional)</label>
+                                <InputTextArea class="form-control form-control-premium" @bind-Value="authorizationCatalogModel.Description" placeholder="Describa el alcance de esta autorización..." rows="2" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <button type="button" class="btn btn-light" @onclick="() => showAuthorizationCatalogModal = false">Cancelar</button>
+                            <button type="submit" class="btn btn-warning text-dark px-4 fw-medium">Guardar Autorización</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE COMPETENCIA -->
+@if (showDeleteCompetencyCatalogConfirm)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content card shadow border-0 rounded-4">
+                <div class="card-header bg-danger text-white py-3 border-0 rounded-top-4">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>¿Eliminar Competencia?</h6>
+                </div>
+                <div class="card-body p-3">
+                    <p class="small text-secondary mb-3">
+                        ¿Está seguro de que desea eliminar la competencia <strong>@deletingCompetencyCatalog?.Code</strong> del catálogo? Esta acción no eliminará las evaluaciones previas pero sí ocultará la competencia del catálogo.
+                    </p>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-light btn-sm" @onclick="() => showDeleteCompetencyCatalogConfirm = false">Cancelar</button>
+                        <button type="button" class="btn btn-danger btn-sm px-3 text-white" @onclick="DeleteCompetencyCatalog">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE AUTORIZACIÓN -->
+@if (showDeleteAuthorizationCatalogConfirm)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content card shadow border-0 rounded-4">
+                <div class="card-header bg-danger text-white py-3 border-0 rounded-top-4">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>¿Eliminar Autorización?</h6>
+                </div>
+                <div class="card-body p-3">
+                    <p class="small text-secondary mb-3">
+                        ¿Está seguro de que desea eliminar la autorización <strong>@deletingAuthorizationCatalog?.Code</strong> del catálogo? Las concesiones activas se preservarán, pero no se podrán otorgar nuevas.
+                    </p>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-light btn-sm" @onclick="() => showDeleteAuthorizationCatalogConfirm = false">Cancelar</button>
+                        <button type="button" class="btn btn-danger btn-sm px-3 text-white" @onclick="DeleteAuthorizationCatalog">Eliminar</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -859,12 +1048,23 @@
     private bool showAssignTrainingModal = false;
     private bool showEvaluationModal = false;
     private bool showAuthorizationModal = false;
+    private bool showCompetencyCatalogModal = false;
+    private bool showAuthorizationCatalogModal = false;
+    private bool showDeleteCompetencyCatalogConfirm = false;
+    private bool showDeleteAuthorizationCatalogConfirm = false;
 
     private bool isEditingStaff = false;
+    private bool isEditingCompetencyCatalog = false;
+    private bool isEditingAuthorizationCatalog = false;
+
+    private CompetencyCatalogDto? deletingCompetencyCatalog;
+    private AuthorizationCatalogDto? deletingAuthorizationCatalog;
 
     // Form Models
     private StaffModel staffModel = new();
     private TrainingModel trainingModel = new();
+    private CompetencyCatalogModel competencyCatalogModel = new();
+    private AuthorizationCatalogModel authorizationCatalogModel = new();
     private AssignmentModel assignmentModel = new();
     private EvaluationModel evaluationModel = new();
     private GrantModel grantModel = new();
@@ -1121,6 +1321,144 @@
         await LoadData();
     }
 
+    // Competency Catalog Handlers
+    private void OpenAddCompetencyCatalogModal()
+    {
+        competencyCatalogModel = new CompetencyCatalogModel
+        {
+            DefaultReassessmentMonths = 12,
+            RoleScope = "AMBOS"
+        };
+        isEditingCompetencyCatalog = false;
+        showCompetencyCatalogModal = true;
+    }
+
+    private void OpenEditCompetencyCatalogModal(CompetencyCatalogDto comp)
+    {
+        competencyCatalogModel = new CompetencyCatalogModel
+        {
+            Id = comp.Id,
+            Code = comp.Code,
+            Name = comp.Name,
+            Description = comp.Description,
+            RoleScope = comp.RoleScope,
+            Area = comp.Area,
+            SubArea = comp.SubArea,
+            DefaultReassessmentMonths = comp.DefaultReassessmentMonths
+        };
+        isEditingCompetencyCatalog = true;
+        showCompetencyCatalogModal = true;
+    }
+
+    private async Task SaveCompetencyCatalog()
+    {
+        var req = new CreateCompetencyCatalogRequest(
+            competencyCatalogModel.Code,
+            competencyCatalogModel.Name,
+            competencyCatalogModel.Description,
+            competencyCatalogModel.RoleScope,
+            competencyCatalogModel.Area,
+            competencyCatalogModel.SubArea,
+            competencyCatalogModel.DefaultReassessmentMonths
+        );
+
+        if (isEditingCompetencyCatalog && competencyCatalogModel.Id.HasValue)
+        {
+            await StaffService.UpdateCompetencyCatalogAsync(competencyCatalogModel.Id.Value, req);
+        }
+        else
+        {
+            await StaffService.CreateCompetencyCatalogAsync(req);
+        }
+
+        showCompetencyCatalogModal = false;
+        await LoadData();
+    }
+
+    private void ConfirmDeleteCompetencyCatalog(CompetencyCatalogDto comp)
+    {
+        deletingCompetencyCatalog = comp;
+        showDeleteCompetencyCatalogConfirm = true;
+    }
+
+    private async Task DeleteCompetencyCatalog()
+    {
+        if (deletingCompetencyCatalog != null)
+        {
+            await StaffService.DeleteCompetencyCatalogAsync(deletingCompetencyCatalog.Id);
+            showDeleteCompetencyCatalogConfirm = false;
+            await LoadData();
+        }
+    }
+
+    // Authorization Catalog Handlers
+    private void OpenAddAuthorizationCatalogModal()
+    {
+        authorizationCatalogModel = new AuthorizationCatalogModel
+        {
+            RoleScope = "AMBOS",
+            RequiresCompetency = false
+        };
+        isEditingAuthorizationCatalog = false;
+        showAuthorizationCatalogModal = true;
+    }
+
+    private void OpenEditAuthorizationCatalogModal(AuthorizationCatalogDto auth)
+    {
+        authorizationCatalogModel = new AuthorizationCatalogModel
+        {
+            Id = auth.Id,
+            Code = auth.Code,
+            Name = auth.Name,
+            Description = auth.Description,
+            RoleScope = auth.RoleScope,
+            RequiresCompetency = auth.RequiresCompetency,
+            ValidityMonths = auth.ValidityMonths
+        };
+        isEditingAuthorizationCatalog = true;
+        showAuthorizationCatalogModal = true;
+    }
+
+    private async Task SaveAuthorizationCatalog()
+    {
+        var req = new CreateAuthorizationCatalogRequest(
+            authorizationCatalogModel.Code,
+            authorizationCatalogModel.Name,
+            authorizationCatalogModel.Description,
+            authorizationCatalogModel.RoleScope,
+            authorizationCatalogModel.RequiresCompetency,
+            authorizationCatalogModel.ValidityMonths
+        );
+
+        if (isEditingAuthorizationCatalog && authorizationCatalogModel.Id.HasValue)
+        {
+            await StaffService.UpdateAuthorizationCatalogAsync(authorizationCatalogModel.Id.Value, req);
+        }
+        else
+        {
+            await StaffService.CreateAuthorizationCatalogAsync(req);
+        }
+
+        showAuthorizationCatalogModal = false;
+        await LoadData();
+    }
+
+    private void ConfirmDeleteAuthorizationCatalog(AuthorizationCatalogDto auth)
+    {
+        deletingAuthorizationCatalog = auth;
+        showDeleteAuthorizationCatalogConfirm = true;
+    }
+
+    private async Task DeleteAuthorizationCatalog()
+    {
+        if (deletingAuthorizationCatalog != null)
+        {
+            await StaffService.DeleteAuthorizationCatalogAsync(deletingAuthorizationCatalog.Id);
+            showDeleteAuthorizationCatalogConfirm = false;
+            await LoadData();
+        }
+    }
+
     // INTERNAL MODELS
 
     public class StaffModel
@@ -1176,5 +1514,28 @@
         public Guid AuthorizationId { get; set; }
         public DateTime ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
+    }
+
+    public class CompetencyCatalogModel
+    {
+        public Guid? Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string RoleScope { get; set; } = "AMBOS";
+        public string Area { get; set; } = string.Empty;
+        public string? SubArea { get; set; }
+        public int DefaultReassessmentMonths { get; set; } = 12;
+    }
+
+    public class AuthorizationCatalogModel
+    {
+        public Guid? Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string RoleScope { get; set; } = "AMBOS";
+        public bool RequiresCompetency { get; set; }
+        public int? ValidityMonths { get; set; }
     }
 }

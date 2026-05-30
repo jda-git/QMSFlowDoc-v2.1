@@ -353,4 +353,95 @@ public class StaffService : IStaffService
             .Select(u => new UserLookupDto(u.Id, u.FullName, u.Email ?? ""))
             .ToListAsync();
     }
+
+    public async Task<Guid> CreateCompetencyCatalogAsync(CreateCompetencyCatalogRequest request)
+    {
+        var comp = new CompetencyCatalog
+        {
+            Id = Guid.NewGuid(),
+            Code = request.Code,
+            Name = request.Name,
+            Description = request.Description,
+            RoleScope = request.RoleScope,
+            Area = request.Area,
+            SubArea = request.SubArea,
+            DefaultReassessmentMonths = request.DefaultReassessmentMonths,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = Guid.Empty
+        };
+
+        _context.CompetencyCatalogs.Add(comp);
+        await _context.SaveChangesAsync();
+        return comp.Id;
+    }
+
+    public async Task UpdateCompetencyCatalogAsync(Guid id, CreateCompetencyCatalogRequest request)
+    {
+        var comp = await _context.CompetencyCatalogs.FirstOrDefaultAsync(c => c.Id == id);
+        if (comp == null) return;
+
+        comp.Code = request.Code;
+        comp.Name = request.Name;
+        comp.Description = request.Description;
+        comp.RoleScope = request.RoleScope;
+        comp.Area = request.Area;
+        comp.SubArea = request.SubArea;
+        comp.DefaultReassessmentMonths = request.DefaultReassessmentMonths;
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteCompetencyCatalogAsync(Guid id)
+    {
+        var comp = await _context.CompetencyCatalogs.FirstOrDefaultAsync(c => c.Id == id);
+        if (comp == null) return;
+
+        comp.IsActive = false;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<Guid> CreateAuthorizationCatalogAsync(CreateAuthorizationCatalogRequest request)
+    {
+        var auth = new AuthorizationCatalog
+        {
+            Id = Guid.NewGuid(),
+            Code = request.Code,
+            Name = request.Name,
+            Description = request.Description,
+            RoleScope = request.RoleScope,
+            RequiresCompetency = request.RequiresCompetency,
+            ValidityMonths = request.ValidityMonths,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.AuthorizationCatalogs.Add(auth);
+        await _context.SaveChangesAsync();
+        return auth.Id;
+    }
+
+    public async Task UpdateAuthorizationCatalogAsync(Guid id, CreateAuthorizationCatalogRequest request)
+    {
+        var auth = await _context.AuthorizationCatalogs.FirstOrDefaultAsync(a => a.Id == id);
+        if (auth == null) return;
+
+        auth.Code = request.Code;
+        auth.Name = request.Name;
+        auth.Description = request.Description;
+        auth.RoleScope = request.RoleScope;
+        auth.RequiresCompetency = request.RequiresCompetency;
+        auth.ValidityMonths = request.ValidityMonths;
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteAuthorizationCatalogAsync(Guid id)
+    {
+        var auth = await _context.AuthorizationCatalogs.FirstOrDefaultAsync(a => a.Id == id);
+        if (auth == null) return;
+
+        auth.IsActive = false;
+        await _context.SaveChangesAsync();
+    }
 }
